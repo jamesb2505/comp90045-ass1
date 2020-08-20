@@ -4,53 +4,59 @@ module Main (runLexer, RToken, AlexPosn, main) where
 
 %wrapper "posn"
 
-$lower = [a-z]
-$alnum = [a-zA-Z0-9_]
+$digit  = 0-9 
+$alpha  = [a-zA-Z] 
+$alnum  = [$alpha $digit]
+@ident  = $alpha [$alnum \_ \']*
+@string = \" [^\"] \"
 
 rules :-
-  $white+        ;
-  and            { \_ _ -> RT_and }
-  array          { \_ _ -> RT_array }
-  boolean        { \_ _ -> RT_boolean }
-  call           { \_ _ -> RT_call }
-  do             { \_ _ -> RT_do }
-  else           { \_ _ -> RT_else }
-  false          { \_ _ -> RT_false }
-  fi             { \_ _ -> RT_fi }
-  if             { \_ _ -> RT_if }
-  integer        { \_ _ -> RT_integer }
-  not            { \_ _ -> RT_not }
-  od             { \_ _ -> RT_od }
-  or             { \_ _ -> RT_or }
-  procedure      { \_ _ -> RT_procedure }
-  read           { \_ _ -> RT_read }
-  record         { \_ _ -> RT_record }
-  then           { \_ _ -> RT_then }
-  true           { \_ _ -> RT_true }
-  val            { \_ _ -> RT_val }
-  while          { \_ _ -> RT_while }
-  write          { \_ _ -> RT_write }
-  writeln        { \_ _ -> RT_writeln }
-  \{             { \_ _ -> RT_lbrace }
-  \}             { \_ _ -> RT_rbrace }
-  \[             { \_ _ -> RT_lbracket }
-  \]             { \_ _ -> RT_rbracket }
-  \(             { \_ _ -> RT_lparen }
-  \)             { \_ _ -> RT_rparen }
-  \,             { \_ _ -> RT_comma }
-  \;             { \_ _ -> RT_semi }
-  \.             { \_ _ -> RT_dot }
-  \=             { \_ _ -> RT_eq }
-  \!\=           { \_ _ -> RT_neq }
-  \<             { \_ _ -> RT_lt }
-  \<=            { \_ _ -> RT_lte }
-  \>             { \_ _ -> RT_gt }
-  \>=            { \_ _ -> RT_gte }
-  \+             { \_ _ -> RT_add }
-  \-             { \_ _ -> RT_sub }
-  \*             { \_ _ -> RT_mul }
-  \/             { \_ _ -> RT_div }
-  $lower $alnum* { \_ s -> RT_ident s }
+  $white+    ;
+  and        { \_ _ -> RT_and }
+  array      { \_ _ -> RT_array }
+  boolean    { \_ _ -> RT_boolean }
+  call       { \_ _ -> RT_call }
+  do         { \_ _ -> RT_do }
+  else       { \_ _ -> RT_else }
+  false      { \_ _ -> RT_false }
+  fi         { \_ _ -> RT_fi }
+  if         { \_ _ -> RT_if }
+  integer    { \_ _ -> RT_integer }
+  not        { \_ _ -> RT_not }
+  od         { \_ _ -> RT_od }
+  or         { \_ _ -> RT_or }
+  procedure  { \_ _ -> RT_procedure }
+  read       { \_ _ -> RT_read }
+  record     { \_ _ -> RT_record }
+  then       { \_ _ -> RT_then }
+  true       { \_ _ -> RT_true }
+  val        { \_ _ -> RT_val }
+  while      { \_ _ -> RT_while }
+  write      { \_ _ -> RT_write }
+  writeln    { \_ _ -> RT_writeln }
+  \{         { \_ _ -> RT_lbrace }
+  \}         { \_ _ -> RT_rbrace }
+  \[         { \_ _ -> RT_lbracket }
+  \]         { \_ _ -> RT_rbracket }
+  \(         { \_ _ -> RT_lparen }
+  \)         { \_ _ -> RT_rparen }
+  \,         { \_ _ -> RT_comma }
+  \;         { \_ _ -> RT_semi }
+  \.         { \_ _ -> RT_dot }
+  \=         { \_ _ -> RT_eq }
+  \!\=       { \_ _ -> RT_neq }
+  \<         { \_ _ -> RT_lt }
+  \<=        { \_ _ -> RT_lte }
+  \>         { \_ _ -> RT_gt }
+  \>=        { \_ _ -> RT_gte }
+  \+         { \_ _ -> RT_add }
+  \-         { \_ _ -> RT_sub }
+  \*         { \_ _ -> RT_mul }
+  \/         { \_ _ -> RT_div }
+  \# .*      { \_ s -> RT_comment s }
+  @string    { \_ s -> RT_string s }
+  $digit+    { \_ s -> RT_number (read s)}
+  @ident     { \_ s -> RT_ident s }
 
 {
 data RToken
@@ -96,11 +102,14 @@ data RToken
   | RT_mul
   | RT_div
   | RT_neg 
+  | RT_comment String
+  | RT_string String
+  | RT_number Int
   | RT_ident String
   deriving (Show)
 
 runLexer :: String -> [RToken]
 runLexer = alexScanTokens
 
-main = getContents >>= print . show . runLexer
+main = getContents >>= print . runLexer
 }

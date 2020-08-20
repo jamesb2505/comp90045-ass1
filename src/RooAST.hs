@@ -72,6 +72,7 @@ data Stmt
 
 data Procedure
   = Procedure [Decl] [Stmt]
+  deriving (Show, Eq)
 
 data Program
   = Program [RecordDef] [ArrayDef] [Procedure]

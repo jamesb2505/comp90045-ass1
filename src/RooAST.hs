@@ -9,16 +9,15 @@ type Ident = String
 data TypeName
   = BoolType
   | IntType
-  | RecordType Record
-  | ArrayType Array
+  | TypeAlias Ident
   deriving (Show, Eq)
 
-data Record
-  = Record [Decl]
+data RecordDef
+  = Record [Decl] Ident
   deriving (Show, Eq)
 
-data Array
-  = Array TypeName Int
+data ArrayDef
+  = Array Int TypeName Ident
   deriving (Show, Eq)
 
 data LValue
@@ -65,8 +64,15 @@ data Stmt
   = Assign LValue Expr
   | Read LValue
   | Write Expr
+  | If Expr [Stmt]
+  | IfElse Expr [Stmt] [Stmt]
+  | While Expr [Stmt]
+  | Call Ident [Expr]
   deriving (Show, Eq)
 
+data Procedure
+  = Procedure [Decl] [Stmt]
+
 data Program
-  = Program [Decl] [Stmt]
+  = Program [RecordDef] [ArrayDef] [Procedure]
   deriving (Show, Eq)

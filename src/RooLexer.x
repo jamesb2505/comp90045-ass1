@@ -53,9 +53,9 @@ rules :-
   \=         { cTok T_eq }
   \!\=       { cTok T_neq }
   \<         { cTok T_lt }
-  \<=        { cTok T_leq }
+  \<\=        { cTok T_leq }
   \>         { cTok T_gt }
-  \>=        { cTok T_geq }
+  \>\=        { cTok T_geq }
   \+         { cTok T_add }
   \-         { cTok T_sub }
   \*         { cTok T_mul }

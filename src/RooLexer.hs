@@ -2,12 +2,11 @@
 {-# LANGUAGE CPP #-}
 {-# LINE 1 "RooLexer.x" #-}
 
-module Main 
+module RooLexer 
   ( runLexer
   , Token
   , AlexPosn
   , PosnToken
-  , main
 ) where
 
 #if __GLASGOW_HASKELL__ >= 603
@@ -18506,7 +18505,7 @@ alex_actions = array (0 :: Int, 105)
   , (0,alex_action_45)
   ]
 
-{-# LINE 69 "RooLexer.x" #-}
+{-# LINE 68 "RooLexer.x" #-}
 
 data Token
   = T_and
@@ -18550,7 +18549,6 @@ data Token
   | T_sub
   | T_mul
   | T_div
-  | T_neg 
   | T_comment String
   | T_string String
   | T_number Int
@@ -18567,8 +18565,6 @@ tok f p s = (p, f s)
 
 cTok :: Token -> AlexPosn -> String -> PosnToken
 cTok t p _ = (p, t)
-
-main = getContents >>= print . alexScanTokens
 
 alex_action_1 =  cTok T_and 
 alex_action_2 =  cTok T_array 

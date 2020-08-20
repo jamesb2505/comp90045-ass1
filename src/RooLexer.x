@@ -108,7 +108,6 @@ data Token
   | T_sub
   | T_mul
   | T_div
-  | T_neg 
   | T_comment String
   | T_string String
   | T_number Int

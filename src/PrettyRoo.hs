@@ -5,18 +5,37 @@ import RooAST
 import Data.List (intercalate)
 
 pprint :: Program -> String
-pprint (Program [] s) = concatMap pStmt s
-pprint (Program d s)  = intercalate ";\n" (map pDecl d) 
-                        ++ "\n\n" 
-                        ++ concatMap pStmt s
+pprint (Program r a p) = defs pRecord r
+                         ++ defs pArray a
+                         ++ (if null r && null a then "" else "\n\n")
+                         ++ intercalate "\n\n" (map pProcedure p)
+  where
+    defs p [] = ""
+    defs p ds = intercalate "\n" (map p ds) ++ "\n"
 
 pDecl :: Decl -> String
-pDecl (Decl t i) = pTypeName t ++ " " ++ i
+pDecl (Decl t i) = pTypeName t ++ " " ++ i ++ ";"
 
-pStmt :: Stmt -> String
-pStmt (Assign l e) = pLValue l ++ " <- " ++ pExpr e
-pStmt (Read l) = "read " ++ pLValue l
-pStmt (Write e) = "write " ++ pExpr e
+pStmt :: Int -> Stmt -> String
+pStmt i (Assign l e)     = pIndent i ++ pLValue l ++ " <- " ++ pExpr e ++ ";"
+pStmt i (Read l)         = pIndent i ++ "read " ++ pLValue l ++ ";"
+pStmt i (Write e)        = pIndent i ++ "write " ++ pExpr e ++ ";"
+pStmt i (If e ss)        = pIndent i ++ "if " ++ pExpr e ++ "then\n"
+                           ++ pStmtList (i + 1) ss
+                           ++ "\n" ++ pIndent i ++ "fi"
+pStmt i (IfElse e ts fs) = pIndent i ++ "if " ++ pExpr e ++ "then\n"
+                           ++ pStmtList (i + 1) ts
+                           ++ "\n" ++ pIndent i ++ "else\n"
+                           ++ pStmtList (i + 1) fs
+                           ++ "\n"
+pStmt i (While e ss)     = pIndent i ++ "while " ++ pExpr e ++ "do\n"
+                           ++ pStmtList (i + 1) ss
+                           ++ "\n" ++ pIndent i ++ "do"
+pStmt i (Call f es)      = pIndent i ++ "call " ++ f ++ "("
+                           ++ pExprList es ++ ");"
+
+pStmtList :: Int -> [Stmt] -> String
+pStmtList i ss = intercalate "\n" (map (pStmt i) ss)
 
 pExpr :: Expr -> String
 pExpr (Lval l)            = pLValue l
@@ -27,6 +46,9 @@ pExpr (BinOpExpr o e1 e2) = "(" ++ pExpr e1 ++ ")"
                             ++ pBinOp o
                             ++ "(" ++ pExpr e2 ++ ")"
 pExpr (UnOpExpr o e)      = pUnOp o ++ "(" ++ pExpr e ++ ")" 
+
+pExprList :: [Expr] -> String
+pExprList es = intercalate ", " (map pExpr es)
 
 pUnOp :: UnOp -> String
 pUnOp Op_not = "not"
@@ -52,16 +74,25 @@ pLValue (LField i f)      = i ++ "." ++ f
 pLValue (LInd i e)        = i ++ "[" ++ pExpr e ++ "]"
 pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
-pArray :: Array -> String
-pArray (Array t i) = "[" ++ show i ++ "] " ++ pTypeName t
+pProcedure :: Procedure -> String
+pProcedure (Procedure ds ss) = "procedure " ++ "()\n" 
+                               ++ intercalate "\n" (map ((pIndent 1 ++) . pDecl) ds) 
+                               ++ "\n{\n"
+                               ++ pStmtList 1 ss
+                               ++ "\n}"
 
-pRecord :: Record -> String
-pRecord (Record d) = "\n    {" 
+pArray :: ArrayDef -> String
+pArray (Array s t i) = "array [" ++ show s ++ "] " ++ pTypeName t ++ i ++ ";"
+
+pRecord :: RecordDef -> String
+pRecord (Record d i) = "record \n" ++ pIndent 1 ++ "{" 
                      ++ intercalate ";\n    ; " (map pDecl d)
-                     ++ "\n    } "
+                     ++ "\n" ++ pIndent 1 ++ "} " ++ i ++ ";"
 
 pTypeName :: TypeName -> String
-pTypeName BoolType       = "bool"
-pTypeName IntType        = "integer"
-pTypeName (RecordType r) = "record " ++ pRecord r
-pTypeName (ArrayType a)  = "array " ++ pArray a
+pTypeName BoolType      = "bool"
+pTypeName IntType       = "integer"
+pTypeName (TypeAlias i) = i
+
+pIndent :: Int -> String
+pIndent i = replicate (4 * i) ' '

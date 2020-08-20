@@ -1,115 +1,128 @@
 {
-module Main (runLexer, RToken, AlexPosn, main) where
+module RooLexer 
+  ( runLexer
+  , Token
+  , AlexPosn
+  , PosnToken
+) where
 }
 
 %wrapper "posn"
 
-$digit  = 0-9 
-$alpha  = [a-zA-Z] 
-$alnum  = [$alpha $digit]
-@ident  = $alpha [$alnum \_ \']*
-@string = \" [^\"]* \"
+$digit   = 0-9 
+$alpha   = [a-zA-Z] 
+$alnum   = [ $alpha $digit ]
+@ident   = $alpha [ $alnum \_ \' ]*
+@string  = \" [^ \" \t \n ]* \"
+@comment = \# .*
+@number  = $digit+
 
 rules :-
   $white+    ;
-  and        { \_ _ -> RT_and }
-  array      { \_ _ -> RT_array }
-  boolean    { \_ _ -> RT_boolean }
-  call       { \_ _ -> RT_call }
-  do         { \_ _ -> RT_do }
-  else       { \_ _ -> RT_else }
-  false      { \_ _ -> RT_false }
-  fi         { \_ _ -> RT_fi }
-  if         { \_ _ -> RT_if }
-  integer    { \_ _ -> RT_integer }
-  not        { \_ _ -> RT_not }
-  od         { \_ _ -> RT_od }
-  or         { \_ _ -> RT_or }
-  procedure  { \_ _ -> RT_procedure }
-  read       { \_ _ -> RT_read }
-  record     { \_ _ -> RT_record }
-  then       { \_ _ -> RT_then }
-  true       { \_ _ -> RT_true }
-  val        { \_ _ -> RT_val }
-  while      { \_ _ -> RT_while }
-  write      { \_ _ -> RT_write }
-  writeln    { \_ _ -> RT_writeln }
-  \{         { \_ _ -> RT_lbrace }
-  \}         { \_ _ -> RT_rbrace }
-  \[         { \_ _ -> RT_lbracket }
-  \]         { \_ _ -> RT_rbracket }
-  \(         { \_ _ -> RT_lparen }
-  \)         { \_ _ -> RT_rparen }
-  \,         { \_ _ -> RT_comma }
-  \;         { \_ _ -> RT_semi }
-  \.         { \_ _ -> RT_dot }
-  \=         { \_ _ -> RT_eq }
-  \!\=       { \_ _ -> RT_neq }
-  \<         { \_ _ -> RT_lt }
-  \<=        { \_ _ -> RT_lte }
-  \>         { \_ _ -> RT_gt }
-  \>=        { \_ _ -> RT_gte }
-  \+         { \_ _ -> RT_add }
-  \-         { \_ _ -> RT_sub }
-  \*         { \_ _ -> RT_mul }
-  \/         { \_ _ -> RT_div }
-  \# .*      { \_ s -> RT_comment s }
-  @string    { \_ s -> RT_string . tail $ init s }
-  $digit+    { \_ s -> RT_number $ read s}
-  @ident     { \_ s -> RT_ident s }
+  and        { cTok T_and }
+  array      { cTok T_array }
+  boolean    { cTok T_boolean }
+  call       { cTok T_call }
+  do         { cTok T_do }
+  else       { cTok T_else }
+  false      { cTok T_false }
+  fi         { cTok T_fi }
+  if         { cTok T_if }
+  integer    { cTok T_integer }
+  not        { cTok T_not }
+  od         { cTok T_od }
+  or         { cTok T_or }
+  procedure  { cTok T_procedure }
+  read       { cTok T_read }
+  record     { cTok T_record }
+  then       { cTok T_then }
+  true       { cTok T_true }
+  val        { cTok T_val }
+  while      { cTok T_while }
+  write      { cTok T_write }
+  writeln    { cTok T_writeln }
+  \{         { cTok T_lbrace }
+  \}         { cTok T_rbrace }
+  \[         { cTok T_lbracket }
+  \]         { cTok T_rbracket }
+  \(         { cTok T_lparen }
+  \)         { cTok T_rparen }
+  \,         { cTok T_comma }
+  \;         { cTok T_semi }
+  \.         { cTok T_dot }
+  \=         { cTok T_eq }
+  \!\=       { cTok T_neq }
+  \<         { cTok T_lt }
+  \<=        { cTok T_lte }
+  \>         { cTok T_gt }
+  \>=        { cTok T_gte }
+  \+         { cTok T_add }
+  \-         { cTok T_sub }
+  \*         { cTok T_mul }
+  \/         { cTok T_div }
+  @comment   { tok (T_comment . tail) }
+  @string    { tok (T_string . tail . init)}
+  @number    { tok (T_number . read) }
+  @ident     { tok T_ident }
 
 {
-data RToken
-  = RT_and
-  | RT_array
-  | RT_boolean
-  | RT_call
-  | RT_do
-  | RT_else
-  | RT_false
-  | RT_fi
-  | RT_if
-  | RT_integer
-  | RT_not
-  | RT_od
-  | RT_or
-  | RT_procedure
-  | RT_read
-  | RT_record
-  | RT_then
-  | RT_true
-  | RT_val
-  | RT_while
-  | RT_write
-  | RT_writeln
-  | RT_lbrace
-  | RT_rbrace
-  | RT_lbracket
-  | RT_rbracket
-  | RT_lparen
-  | RT_rparen
-  | RT_comma
-  | RT_semi
-  | RT_dot
-  | RT_eq
-  | RT_neq 
-  | RT_lt
-  | RT_lte
-  | RT_gt
-  | RT_gte
-  | RT_add
-  | RT_sub
-  | RT_mul
-  | RT_div
-  | RT_neg 
-  | RT_comment String
-  | RT_string String
-  | RT_number Int
-  | RT_ident String
+data Token
+  = T_and
+  | T_array
+  | T_boolean
+  | T_call
+  | T_do
+  | T_else
+  | T_false
+  | T_fi
+  | T_if
+  | T_integer
+  | T_not
+  | T_od
+  | T_or
+  | T_procedure
+  | T_read
+  | T_record
+  | T_then
+  | T_true
+  | T_val
+  | T_while
+  | T_write
+  | T_writeln
+  | T_lbrace
+  | T_rbrace
+  | T_lbracket
+  | T_rbracket
+  | T_lparen
+  | T_rparen
+  | T_comma
+  | T_semi
+  | T_dot
+  | T_eq
+  | T_neq 
+  | T_lt
+  | T_lte
+  | T_gt
+  | T_gte
+  | T_add
+  | T_sub
+  | T_mul
+  | T_div
+  | T_neg 
+  | T_comment String
+  | T_string String
+  | T_number Int
+  | T_ident String
   deriving (Show)
 
-runLexer :: String -> [RToken]
+type PosnToken = (AlexPosn, Token)
+
+runLexer :: String -> [PosnToken]
 runLexer = alexScanTokens
 
-main = getContents >>= print . runLexer
+tok :: (String -> Token) -> AlexPosn -> String -> PosnToken
+tok f p s = (p, f s)
+
+cTok :: Token -> AlexPosn -> String -> PosnToken
+cTok t p _ = (p, t)
 }

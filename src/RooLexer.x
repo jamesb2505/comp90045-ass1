@@ -8,7 +8,7 @@ $digit  = 0-9
 $alpha  = [a-zA-Z] 
 $alnum  = [$alpha $digit]
 @ident  = $alpha [$alnum \_ \']*
-@string = \" [^\"] \"
+@string = \" [^\"]* \"
 
 rules :-
   $white+    ;
@@ -54,8 +54,8 @@ rules :-
   \*         { \_ _ -> RT_mul }
   \/         { \_ _ -> RT_div }
   \# .*      { \_ s -> RT_comment s }
-  @string    { \_ s -> RT_string s }
-  $digit+    { \_ s -> RT_number (read s)}
+  @string    { \_ s -> RT_string . tail $ init s }
+  $digit+    { \_ s -> RT_number $ read s}
   @ident     { \_ s -> RT_ident s }
 
 {

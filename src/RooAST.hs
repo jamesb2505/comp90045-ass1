@@ -23,19 +23,19 @@ data Array
 
 data LValue
   = LId Ident
-  | LIdComp Ident Ident
-  | LIdInd Ident Exp
-  | LIdIndComp Ident Exp Ident
+  | LField Ident Ident
+  | LInd Ident Expr
+  | LIndField Ident Expr Ident
   deriving (Show, Eq)
 
 data BinOp
   = Op_or
   | Op_and
-  | Op_equ
+  | Op_eq
   | Op_neq
-  | Op_lss
+  | Op_ls
   | Op_leq
-  | Op_gtr
+  | Op_gt
   | Op_geq
   | Op_add
   | Op_sub
@@ -48,13 +48,13 @@ data UnOp
   | Op_neg
   deriving (Show, Eq)    
 
-data Exp
+data Expr
   = Lval LValue
   | BoolConst Bool
   | IntConst Int
   | StrConst String
-  | BinOpExp BinOp Exp Exp
-  | UnOpExp UnOp Exp
+  | BinOpExpr BinOp Expr Expr
+  | UnOpExpr UnOp Expr
   deriving (Show, Eq)
 
 data Decl
@@ -62,9 +62,9 @@ data Decl
   deriving (Show, Eq)
 
 data Stmt
-  = Assign LValue Exp
+  = Assign LValue Expr
   | Read LValue
-  | Write Exp
+  | Write Expr
   deriving (Show, Eq)
 
 data Program

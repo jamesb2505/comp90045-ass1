@@ -7,14 +7,14 @@ import Data.List (intercalate)
 pprint :: Program -> String
 pprint (Program r a p) = defs pRecord r
                          ++ defs pArray a
-                         ++ (if null r && null a then "" else "\n\n")
+                         ++ (if null r && null a then "" else "\n")
                          ++ intercalate "\n\n" (map pProcedure p)
   where
     defs p [] = ""
     defs p ds = intercalate "\n" (map p ds) ++ "\n"
 
 pDecl :: Decl -> String
-pDecl (Decl t i) = pTypeName t ++ " " ++ i ++ ";"
+pDecl (Decl t i) = pTypeName t ++ " " ++ i
 
 pStmt :: Int -> Stmt -> String
 pStmt i (Assign l e)     = pIndent i $ pLValue l ++ " <- " ++ pExpr e ++ ";"
@@ -75,21 +75,22 @@ pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
 pProcedure :: Procedure -> String
 pProcedure (Procedure ds ss) = "procedure " ++ "()\n" 
-                               ++ intercalate "\n" (map (pIndent 1 . pDecl) ds) 
-                               ++ "\n{\n"
+                               ++ decls
+                               ++ "{\n"
                                ++ pStmtList 1 ss
                                ++ "\n}"
+  where decls = intercalate "\n" (map (pIndent 1 . pDecl) ds) ++ ";\n"
 
 pArray :: ArrayDef -> String
 pArray (Array s t i) = "array [" ++ show s ++ "] " ++ pTypeName t ++ i ++ ";"
 
 pRecord :: RecordDef -> String
-pRecord (Record d i) = "record \n" ++ (pIndent 1 "{") 
-                       ++ intercalate ";\n    ; " (map pDecl d) ++ "\n"
+pRecord (Record d i) = "record \n" ++ (pIndent 1 "{ ") 
+                       ++ intercalate "\n    ; " (map pDecl d) ++ "\n"
                        ++ (pIndent 1 "} " ++ i ++ ";")
 
 pTypeName :: TypeName -> String
-pTypeName BoolType      = "bool"
+pTypeName BoolType      = "boolean"
 pTypeName IntType       = "integer"
 pTypeName (TypeAlias i) = i
 

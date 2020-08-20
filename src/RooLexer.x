@@ -53,9 +53,9 @@ rules :-
   \=         { cTok T_eq }
   \!\=       { cTok T_neq }
   \<         { cTok T_lt }
-  \<=        { cTok T_lte }
+  \<=        { cTok T_leq }
   \>         { cTok T_gt }
-  \>=        { cTok T_gte }
+  \>=        { cTok T_geq }
   \+         { cTok T_add }
   \-         { cTok T_sub }
   \*         { cTok T_mul }
@@ -101,9 +101,9 @@ data Token
   | T_eq
   | T_neq 
   | T_lt
-  | T_lte
+  | T_leq
   | T_gt
-  | T_gte
+  | T_geq
   | T_add
   | T_sub
   | T_mul

@@ -63,6 +63,7 @@ pStmtL ss = concatMap (map indent . pStmt') ss
     pStmt' (Assign l e)     = [ pLValue l ++ " <- " ++ pExpr e ++ ";" ]
     pStmt' (Read l)         = [ "read " ++ pLValue l ++ ";" ]
     pStmt' (Write e)        = [ "write " ++ pExpr e ++ ";" ]
+    pStmt' (Writeln e)      = [ "writeln " ++ pExpr e ++ ";" ]
     pStmt' (If e ss)        = [ "if " ++ pExpr e ++ " then" ]
                               ++ pStmtL ss
                               ++ [ "fi" ]

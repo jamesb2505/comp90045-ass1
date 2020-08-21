@@ -52,26 +52,28 @@ pprint (Program r a p)
 pDecl :: Decl -> String
 pDecl (Decl t i) = pTypeName t ++ " " ++ i
 
-pStmt :: Int -> Stmt -> String
-pStmt i (Assign l e)     = indent i $ pLValue l ++ " <- " ++ pExpr e ++ ";"
-pStmt i (Read l)         = indent i $ "read " ++ pLValue l ++ ";"
-pStmt i (Write e)        = indent i $ "write " ++ pExpr e ++ ";"
-pStmt i (If e ss)        = indent i "if " ++ pExpr e ++ " then\n"
-                           ++ pStmtList (i + 1) ss ++ "\n"
-                           ++ indent i "fi"
-pStmt i (IfElse e ts fs) = indent i "if " ++ pExpr e ++ " then\n"
-                           ++ pStmtList (i + 1) ts ++ "\n" 
-                           ++ (indent i "else\n")
-                           ++ pStmtList (i + 1) fs ++ "\n"
-                           ++ indent i "fi"
-pStmt i (While e ss)     = indent i "while " ++ pExpr e ++ " do\n"
-                           ++ pStmtList (i + 1) ss ++ "\n"
-                           ++ indent i "od"
-pStmt i (Call f es)      = indent i "call " ++ f 
-                             ++ "(" ++ pExprList es ++ ");"
+pStmt :: [Stmt] -> String
+pStmt ss = intercalate "\n" (pStmtL ss)
 
-pStmtList :: Int -> [Stmt] -> String
-pStmtList i ss = intercalate "\n" (map (pStmt i) ss)
+pStmtL :: [Stmt] -> [String]
+pStmtL ss = concatMap (map indent . pStmt') ss
+  where
+    pStmt' :: Stmt -> [String]
+    pStmt' (Assign l e)     = [ pLValue l ++ " <- " ++ pExpr e ++ ";" ]
+    pStmt' (Read l)         = [ "read " ++ pLValue l ++ ";" ]
+    pStmt' (Write e)        = [ "write " ++ pExpr e ++ ";" ]
+    pStmt' (If e ss)        = [ "if " ++ pExpr e ++ " then" ]
+                              ++ pStmtL ss
+                              ++ [ "fi" ]
+    pStmt' (IfElse e ts fs) = [ "if " ++ pExpr e ++ " then" ]
+                              ++ pStmtL ts 
+                              ++ [ "else" ]
+                              ++ pStmtL fs
+                              ++ [ "fi" ]
+    pStmt' (While e ss)     = [ "while " ++ pExpr e ++ " do" ]
+                              ++ pStmtL ss
+                              ++ [ "od" ]
+    pStmt' (Call f es)      = [ "call " ++ f ++ "(" ++ pExprList es ++ ");" ]
 
 pExpr :: Expr -> String
 pExpr (Lval l)          = pLValue l
@@ -122,10 +124,10 @@ pProcedure :: Procedure -> String
 pProcedure (Procedure ds ss) = "procedure " ++ {-name-} "<name>" 
                                  ++ " (" ++ pParamList [{-params-}] ++")\n" 
                                ++ decls ds ++ "{\n"
-                               ++ pStmtList 1 ss ++ "\n}\n"
+                               ++ pStmt ss ++ "\n}\n"
   where 
     decls [] = []
-    decls ds = intercalate ";\n" (map (indent 1 . pDecl) ds) ++ ";\n"
+    decls ds = intercalate ";\n" (map (indent . pDecl) ds) ++ ";\n"
 
 pParamList :: [Decl] -> String
 pParamList ds = intercalate ", " (map pDecl ds)
@@ -135,17 +137,17 @@ pArray (Array s t i) = "array [" ++ show s ++ "] "
                        ++ pTypeName t ++ " " ++ i ++ ";"
 
 pRecord :: RecordDef -> String
-pRecord (Record d i) = "record \n" ++ indent 1 "{ " 
-                       ++ intercalate "\n    ; " (map pDecl d) ++ "\n"
-                       ++ indent 1 "} " ++ i ++ ";"
+pRecord (Record d i) = "record \n" ++ indent "{ " ++ fields ++ "\n"
+                                   ++ indent "} " ++ i ++ ";"
+  where fields = intercalate ("\n" ++ indent "; ") (map pDecl d) 
 
 pTypeName :: TypeName -> String
 pTypeName BoolType      = "boolean"
 pTypeName IntType       = "integer"
 pTypeName (TypeAlias i) = i
 
-indent :: Int -> String -> String
-indent i s = replicate (4 * i) ' ' ++ s
+indent :: String -> String
+indent s = replicate 4 ' ' ++ s
 
 paren :: String -> String
 paren s = "(" ++ s ++ ")"

@@ -2,21 +2,18 @@ module PrettyRoo (pprint) where
 
 import RooAST
 
-import Data.L (intercalate)
+import Data.List (intercalate)
 
 pprint :: Program -> String
-pprint (Program r a p) 
-  = intercalate "\n" [ decs pRecord r
-                     , decs pArray a
-                     , (if null r && null a then "" else "\n")
-                       ++ intercalate "\n" (map pProcedure p)
+pprint (Program rs as ps) 
+  = intercalate "\n" [ decs pRecord rs
+                     , decs pArray as
+                     , (if null rs && null as then "" else "\n")
+                       ++ intercalate "\n" (map pProcedure ps)
                      ]
   where
     decs _ [] = ""
     decs p ds = intercalate "\n" (map p ds)
-
-pDecl :: Decl -> String
-pDecl (Decl t i) = pTypeName t ++ " " ++ i
 
 pStmt :: [Stmt] -> String
 pStmt ss = intercalate "\n" (pStmtL ss)
@@ -54,7 +51,7 @@ pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ pBinOp o
                           ++ binParen isLAssoc o r
   where 
-    binParen r o e = if opPrec o < prec e || (opPrec o == prec e && r o)
+    binParen a o e = if opPrec o < prec e || (opPrec o == prec e && a o)
                      then paren (pExpr e) 
                      else pExpr e
     prec (BinOpExpr o _ _) = opPrec o 
@@ -88,34 +85,43 @@ pLValue (LInd i e)        = i ++ "[" ++ pExpr e ++ "]"
 pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
 pProcedure :: Procedure -> String
-pProcedure (Procedure ps ds ss i ) = "procedure " ++ i 
+pProcedure (Procedure ps vs ss i ) = "procedure " ++ i 
                                        ++ " (" ++ pParamL  ps ++")\n" 
-                                     ++ decls ds ++ "{\n" ++ pStmt ss 
+                                     ++ vars vs ++ "{\n" ++ pStmt ss 
                                      ++ if null ss then "}\n" else "\n}\n"
   where 
-    decls [] = []
-    decls ds = intercalate ";\n" (map (indent . pDecl) ds) ++ ";\n"
+    vars [] = []
+    vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
 
-pParam :: Parameter -> String
-pParam (ParamVal (Decl t i)) = pTypeName t ++ " val " ++ i
-pParam (ParamRef (Decl t i)) = pTypeName t ++ " " ++ i 
+pVar :: Var -> String
+pVar (Var t is) = pTypeName t ++ " " ++ intercalate ", " is
 
-pParamL  :: [Parameter] -> String
-pParamL  ds = intercalate ", " (map pParam ds)
+pParam :: Param -> String
+pParam (Param Val t i) = pTypeName t ++ " val " ++ i
+pParam (Param Ref t i) = pTypeName t ++ " " ++ i 
 
-pArray :: ArrayDef -> String
+pParamL :: [Param] -> String
+pParamL ds = intercalate ", " (map pParam ds)
+
+pArray :: Array -> String
 pArray (Array s t i) = "array [" ++ show s ++ "] " 
                        ++ pTypeName t ++ " " ++ i ++ ";"
 
-pRecord :: RecordDef -> String
-pRecord (Record d i) = "record \n" ++ indent "{ " ++ fields ++ "\n"
-                                   ++ indent "} " ++ i ++ ";"
-  where fields = intercalate ("\n" ++ indent "; ") (map pDecl d) 
+pRecord :: Record -> String
+pRecord (Record fs i) = "record \n" ++ indent "{ " ++ fields ++ "\n"
+                                    ++ indent "} " ++ i ++ ";"
+  where fields = intercalate ("\n" ++ indent "; ") (map pField fs) 
+
+pField :: Field -> String
+pField (Field t i) = pBaseType t ++ " " ++ i
 
 pTypeName :: TypeName -> String
-pTypeName BoolType      = "boolean"
-pTypeName IntType       = "integer"
-pTypeName (TypeAlias i) = i
+pTypeName (Base b)  = pBaseType b
+pTypeName (Alias i) = i
+
+pBaseType :: BaseType -> String
+pBaseType IntType  = "integer"
+pBaseType BoolType = "boolean"
 
 indent :: String -> String
 indent s = replicate 4 ' ' ++ s

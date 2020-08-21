@@ -80,7 +80,9 @@ data Param
   = Param TypeName Mode Ident
   deriving (Show, Eq)
   
-data Mode = Val | Ref
+data Mode 
+  = Val | Ref
+  deriving (Show, Eq)
 
 data Procedure
   = Procedure [Param] [VarDecl] [Stmt] Ident

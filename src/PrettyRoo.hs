@@ -8,9 +8,9 @@ import Data.List (intercalate)
 prog = Program [r] [a] [p, p2, p3]
 p = Procedure [Decl BoolType "h"] [] 
 p2 = Procedure [Decl IntType "h"] [Assign (LId "i") (Lval (LId "j"))] 
-p3 = Procedure [] [Assign (LId "i") cf, Assign (LId "i") cc, w, i, e] 
+p3 = Procedure [] [Assign (LId "i") cf, Assign (LId "i") cc, w, i, e, Assign (LId "i") nn] 
 r = Record [Decl BoolType "b", Decl IntType "i"] "r"
-a = Array 10 BoolType "r"
+a = Array 10 IntType "r"
 w = While (BoolConst False) [Assign (LId "i") (Lval (LId "j"))]
 i = If (BoolConst True) [w]
 e = IfElse (BoolConst True) [Assign (LId "u") cf] [w]
@@ -37,6 +37,7 @@ cc = BinOpExpr Op_sub
       (BinOpExpr Op_mul (IntConst 2) (IntConst 5) )
     )
   )
+nn = UnOpExpr Op_neg (UnOpExpr Op_neg (IntConst 2))
 
 pprint :: Program -> String
 pprint (Program r a p) 
@@ -84,7 +85,7 @@ pExpr (UnOpExpr o e)    = pUnOp o ++ (if isOp e
                                       then paren (pExpr e)
                                       else (pExpr e))
 pExpr (BinOpExpr o l r) = binParen isRAssoc o l
-                          ++ " " ++ pBinOp o ++ " "
+                          ++ pBinOp o
                           ++ binParen isLAssoc o r
   where 
     binParen r o e = if opPrec o < prec e || (opPrec o == prec e && r o)
@@ -101,18 +102,18 @@ pUnOp Op_not = "not "
 pUnOp Op_neg = "-"
 
 pBinOp :: BinOp -> String
-pBinOp Op_or  = "or"
-pBinOp Op_and = "and"
-pBinOp Op_eq  = "="
-pBinOp Op_neq = "!="
-pBinOp Op_ls  = "<"
-pBinOp Op_leq = "<="
-pBinOp Op_gt  = ">"
-pBinOp Op_geq = ">="
-pBinOp Op_add = "+"
-pBinOp Op_sub = "-"
-pBinOp Op_mul = "*"
-pBinOp Op_div = "/"
+pBinOp Op_or  = " or "
+pBinOp Op_and = " and "
+pBinOp Op_eq  = " = "
+pBinOp Op_neq = " != "
+pBinOp Op_ls  = " < "
+pBinOp Op_leq = " <= "
+pBinOp Op_gt  = " > "
+pBinOp Op_geq = " >= "
+pBinOp Op_add = " + "
+pBinOp Op_sub = " - "
+pBinOp Op_mul = " * "
+pBinOp Op_div = " / "
 
 pLValue :: LValue -> String
 pLValue (LId i)           = i
@@ -123,8 +124,8 @@ pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 pProcedure :: Procedure -> String
 pProcedure (Procedure ds ss) = "procedure " ++ {-name-} "<name>" 
                                  ++ " (" ++ pParamList [{-params-}] ++")\n" 
-                               ++ decls ds ++ "{\n"
-                               ++ pStmt ss ++ "\n}\n"
+                               ++ decls ds ++ "{\n" ++ pStmt ss 
+                               ++ if null ss then "}\n" else "\n}\n"
   where 
     decls [] = []
     decls ds = intercalate ";\n" (map (indent . pDecl) ds) ++ ";\n"
@@ -159,13 +160,15 @@ isRAssoc :: BinOp -> Bool
 isRAssoc = not . isLAssoc
 
 opPrec :: BinOp -> Int
-opPrec Op_or  = 1
-opPrec Op_and = 2
-opPrec Op_mul = 2
-opPrec Op_div = 2
+opPrec Op_mul = 1
+opPrec Op_div = 1
+opPrec Op_add = 2
+opPrec Op_sub = 2
+opPrec Op_and = 4
+opPrec Op_or  = 5
 opPrec _      = 3
 
 isOp :: Expr -> Bool
-isOp (BinOpExpr _ _ _)  = True
-isOp (UnOpExpr _ _)     = True
-isOp _                  = False
+isOp (BinOpExpr _ _ _) = True
+isOp (UnOpExpr _ _)    = True
+isOp _                 = False

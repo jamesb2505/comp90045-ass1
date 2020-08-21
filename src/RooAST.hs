@@ -11,9 +11,18 @@ data TypeName
   | IntType
   | TypeAlias Ident
   deriving (Show, Eq)
+  
+data VarDecl
+  = VarDecl TypeName [Ident]
+  deriving (Show, Eq)
 
 data RecordDef
-  = Record [Decl] Ident
+  = Record [FieldDecl] Ident
+  deriving (Show, Eq)
+  
+data FieldDecl
+  = BoolField Ident
+  | IntField Ident
   deriving (Show, Eq)
 
 data ArrayDef
@@ -56,10 +65,6 @@ data Expr
   | UnOpExpr UnOp Expr
   deriving (Show, Eq)
 
-data Decl
-  = Decl TypeName Ident
-  deriving (Show, Eq)
-
 data Stmt
   = Assign LValue Expr
   | Read LValue
@@ -71,15 +76,16 @@ data Stmt
   | Call Ident [Expr]
   deriving (Show, Eq)
 
-data Procedure
-  = Procedure [Parameter] [Decl] [Stmt] Ident
+data Param
+  = Param TypeName Mode Ident
   deriving (Show, Eq)
   
-data Parameter
-  = ParamVal Decl  
-  | ParamRef Decl 
-  deriving (Show, Eq)
+data Mode = Val | Ref
 
+data Procedure
+  = Procedure [Param] [VarDecl] [Stmt] Ident
+  deriving (Show, Eq)
+  
 data Program
   = Program [RecordDef] [ArrayDef] [Procedure]
   deriving (Show, Eq)

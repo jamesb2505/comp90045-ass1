@@ -71,7 +71,12 @@ data Stmt
   deriving (Show, Eq)
 
 data Procedure
-  = Procedure [Decl] [Stmt]
+  = Procedure [Parameter] [Decl] [Stmt] Ident
+  deriving (Show, Eq)
+  
+data Parameter
+  = ParamVal Decl  
+  | ParamRef Decl 
   deriving (Show, Eq)
 
 data Program

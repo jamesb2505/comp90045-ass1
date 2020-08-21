@@ -18290,7 +18290,6 @@ alex_accept = listArray (0 :: Int, 126)
   , AlexAccNone
   , AlexAccNone
   , AlexAccSkip
-  , AlexAcc 104
   , AlexAcc 103
   , AlexAcc 102
   , AlexAcc 101
@@ -18332,6 +18331,7 @@ alex_accept = listArray (0 :: Int, 126)
   , AlexAcc 65
   , AlexAcc 64
   , AlexAcc 63
+  , AlexAccSkip
   , AlexAcc 62
   , AlexAcc 61
   , AlexAcc 60
@@ -18397,49 +18397,48 @@ alex_accept = listArray (0 :: Int, 126)
   , AlexAcc 0
   ]
 
-alex_actions = array (0 :: Int, 105)
-  [ (104,alex_action_1)
-  , (103,alex_action_2)
-  , (102,alex_action_3)
-  , (101,alex_action_4)
-  , (100,alex_action_5)
-  , (99,alex_action_6)
-  , (98,alex_action_7)
-  , (97,alex_action_8)
-  , (96,alex_action_9)
-  , (95,alex_action_10)
-  , (94,alex_action_11)
-  , (93,alex_action_12)
-  , (92,alex_action_13)
-  , (91,alex_action_14)
-  , (90,alex_action_15)
-  , (89,alex_action_16)
-  , (88,alex_action_17)
-  , (87,alex_action_18)
-  , (86,alex_action_19)
-  , (85,alex_action_20)
-  , (84,alex_action_21)
-  , (83,alex_action_22)
-  , (82,alex_action_23)
-  , (81,alex_action_24)
-  , (80,alex_action_25)
-  , (79,alex_action_26)
-  , (78,alex_action_27)
-  , (77,alex_action_28)
-  , (76,alex_action_29)
-  , (75,alex_action_30)
-  , (74,alex_action_31)
-  , (73,alex_action_32)
-  , (72,alex_action_33)
-  , (71,alex_action_34)
-  , (70,alex_action_35)
-  , (69,alex_action_36)
-  , (68,alex_action_37)
-  , (67,alex_action_38)
-  , (66,alex_action_39)
-  , (65,alex_action_40)
-  , (64,alex_action_41)
-  , (63,alex_action_42)
+alex_actions = array (0 :: Int, 104)
+  [ (103,alex_action_1)
+  , (102,alex_action_2)
+  , (101,alex_action_3)
+  , (100,alex_action_4)
+  , (99,alex_action_5)
+  , (98,alex_action_6)
+  , (97,alex_action_7)
+  , (96,alex_action_8)
+  , (95,alex_action_9)
+  , (94,alex_action_10)
+  , (93,alex_action_11)
+  , (92,alex_action_12)
+  , (91,alex_action_13)
+  , (90,alex_action_14)
+  , (89,alex_action_15)
+  , (88,alex_action_16)
+  , (87,alex_action_17)
+  , (86,alex_action_18)
+  , (85,alex_action_19)
+  , (84,alex_action_20)
+  , (83,alex_action_21)
+  , (82,alex_action_22)
+  , (81,alex_action_23)
+  , (80,alex_action_24)
+  , (79,alex_action_25)
+  , (78,alex_action_26)
+  , (77,alex_action_27)
+  , (76,alex_action_28)
+  , (75,alex_action_29)
+  , (74,alex_action_30)
+  , (73,alex_action_31)
+  , (72,alex_action_32)
+  , (71,alex_action_33)
+  , (70,alex_action_34)
+  , (69,alex_action_35)
+  , (68,alex_action_36)
+  , (67,alex_action_37)
+  , (66,alex_action_38)
+  , (65,alex_action_39)
+  , (64,alex_action_40)
+  , (63,alex_action_41)
   , (62,alex_action_43)
   , (61,alex_action_44)
   , (60,alex_action_45)
@@ -18549,7 +18548,6 @@ data Token
   | T_sub
   | T_mul
   | T_div
-  | T_comment String
   | T_string String
   | T_number Int
   | T_ident String
@@ -18607,7 +18605,6 @@ alex_action_38 =  cTok T_add
 alex_action_39 =  cTok T_sub 
 alex_action_40 =  cTok T_mul 
 alex_action_41 =  cTok T_div 
-alex_action_42 =  tok (T_comment . tail) 
 alex_action_43 =  tok (T_string . tail . init)
 alex_action_44 =  tok (T_number . read) 
 alex_action_45 =  tok T_ident 

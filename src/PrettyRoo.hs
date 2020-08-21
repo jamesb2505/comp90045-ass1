@@ -2,13 +2,13 @@ module PrettyRoo (pprint) where
 
 import RooAST
 
-import Data.List (intercalate)
+import Data.L  (intercalate)
 
 -- testing
 prog = Program [r] [a] [p, p2, p3]
-p = Procedure [Decl BoolType "h"] [] 
-p2 = Procedure [Decl IntType "h"] [Assign (LId "i") (Lval (LId "j"))] 
-p3 = Procedure [] [Assign (LId "i") cf, Assign (LId "i") cc, w, i, e, Assign (LId "i") nn] 
+p = Procedure [] [Decl BoolType "h"] [] "proc"
+p2 = Procedure [ParamVal (Decl IntType "h"), ParamRef (Decl IntType "h")] [] [Assign (LId "i") (Lval (LId "j"))] "p"
+p3 = Procedure [] [] [Assign (LId "i") cf, Assign (LId "i") cc, w, i, e, Assign (LId "i") nn] "p"
 r = Record [Decl BoolType "b", Decl IntType "i"] "r"
 a = Array 10 IntType "r"
 w = While (BoolConst False) [Assign (LId "i") (Lval (LId "j"))]
@@ -74,7 +74,7 @@ pStmtL ss = concatMap (map indent . pStmt') ss
     pStmt' (While e ss)     = [ "while " ++ pExpr e ++ " do" ]
                               ++ pStmtL ss
                               ++ [ "od" ]
-    pStmt' (Call f es)      = [ "call " ++ f ++ "(" ++ pExprList es ++ ");" ]
+    pStmt' (Call f es)      = [ "call " ++ f ++ "(" ++ pExprL es ++ ");" ]
 
 pExpr :: Expr -> String
 pExpr (Lval l)          = pLValue l
@@ -94,8 +94,8 @@ pExpr (BinOpExpr o l r) = binParen isRAssoc o l
     prec (BinOpExpr o _ _) = opPrec o 
     prec _                 = -1 
 
-pExprList :: [Expr] -> String
-pExprList es = intercalate ", " (map pExpr es)
+pExprL :: [Expr] -> String
+pExprL es = intercalate ", " (map pExpr es)
 
 pUnOp :: UnOp -> String
 pUnOp Op_not = "not "
@@ -122,16 +122,20 @@ pLValue (LInd i e)        = i ++ "[" ++ pExpr e ++ "]"
 pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
 pProcedure :: Procedure -> String
-pProcedure (Procedure ds ss) = "procedure " ++ {-name-} "<name>" 
-                                 ++ " (" ++ pParamList [{-params-}] ++")\n" 
-                               ++ decls ds ++ "{\n" ++ pStmt ss 
-                               ++ if null ss then "}\n" else "\n}\n"
+pProcedure (Procedure ps ds ss i ) = "procedure " ++ i 
+                                       ++ " (" ++ pParamL  ps ++")\n" 
+                                     ++ decls ds ++ "{\n" ++ pStmt ss 
+                                     ++ if null ss then "}\n" else "\n}\n"
   where 
     decls [] = []
     decls ds = intercalate ";\n" (map (indent . pDecl) ds) ++ ";\n"
 
-pParamList :: [Decl] -> String
-pParamList ds = intercalate ", " (map pDecl ds)
+pParam :: Parameter -> String
+pParam (ParamVal (Decl t i)) = pTypeName t ++ " val " ++ i
+pParam (ParamRef (Decl t i)) = pTypeName t ++ " " ++ i 
+
+pParamL  :: [Parameter] -> String
+pParamL  ds = intercalate ", " (map pParam ds)
 
 pArray :: ArrayDef -> String
 pArray (Array s t i) = "array [" ++ show s ++ "] " 
@@ -154,7 +158,7 @@ paren :: String -> String
 paren s = "(" ++ s ++ ")"
 
 isLAssoc :: BinOp -> Bool
-isLAssoc _  = True
+isLAssoc _ = True
 
 isRAssoc :: BinOp -> Bool
 isRAssoc = not . isLAssoc

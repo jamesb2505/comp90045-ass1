@@ -53,14 +53,14 @@ rules :-
   \=         { cTok T_eq }
   \!\=       { cTok T_neq }
   \<         { cTok T_lt }
-  \<\=        { cTok T_leq }
+  \<\=       { cTok T_leq }
   \>         { cTok T_gt }
-  \>\=        { cTok T_geq }
+  \>\=       { cTok T_geq }
   \+         { cTok T_add }
   \-         { cTok T_sub }
   \*         { cTok T_mul }
   \/         { cTok T_div }
-  @comment   { tok (T_comment . tail) }
+  @comment   ;
   @string    { tok (T_string . tail . init)}
   @number    { tok (T_number . read) }
   @ident     { tok T_ident }
@@ -108,7 +108,6 @@ data Token
   | T_sub
   | T_mul
   | T_div
-  | T_comment String
   | T_string String
   | T_number Int
   | T_ident String

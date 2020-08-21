@@ -2,42 +2,7 @@ module PrettyRoo (pprint) where
 
 import RooAST
 
-import Data.L  (intercalate)
-
--- testing
-prog = Program [r] [a] [p, p2, p3]
-p = Procedure [] [Decl BoolType "h"] [] "proc"
-p2 = Procedure [ParamVal (Decl IntType "h"), ParamRef (Decl IntType "h")] [] [Assign (LId "i") (Lval (LId "j"))] "p"
-p3 = Procedure [] [] [Assign (LId "i") cf, Assign (LId "i") cc, w, i, e, Assign (LId "i") nn] "p"
-r = Record [Decl BoolType "b", Decl IntType "i"] "r"
-a = Array 10 IntType "r"
-w = While (BoolConst False) [Assign (LId "i") (Lval (LId "j"))]
-i = If (BoolConst True) [w]
-e = IfElse (BoolConst True) [Assign (LId "u") cf] [w]
-cf = BinOpExpr Op_div (BinOpExpr Op_mul 
-                        (BinOpExpr Op_add (IntConst 1) (IntConst 2)) 
-                        (IntConst 3)) 
-                      (IntConst 4)
--- ((13+(3*5)*7)-(2*7))-(11/(20/(2*5)))
-cc = BinOpExpr Op_sub 
-  (BinOpExpr Op_sub 
-    (BinOpExpr Op_add 
-      (IntConst 13)
-      (BinOpExpr Op_mul 
-        (BinOpExpr Op_mul (IntConst 3) (IntConst 5))
-        (IntConst 7)
-      )
-    )
-    (BinOpExpr Op_mul (IntConst 2) (IntConst 2))
-  ) 
-  (BinOpExpr Op_div
-    (IntConst 11)
-    (BinOpExpr Op_div
-      (IntConst 20)
-      (BinOpExpr Op_mul (IntConst 2) (IntConst 5) )
-    )
-  )
-nn = UnOpExpr Op_neg (UnOpExpr Op_neg (IntConst 2))
+import Data.L (intercalate)
 
 pprint :: Program -> String
 pprint (Program r a p) 

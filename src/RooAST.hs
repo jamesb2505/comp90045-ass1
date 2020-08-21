@@ -64,6 +64,7 @@ data Stmt
   = Assign LValue Expr
   | Read LValue
   | Write Expr
+  | Writeln Expr
   | If Expr [Stmt]
   | IfElse Expr [Stmt] [Stmt]
   | While Expr [Stmt]

@@ -1,2 +1,4 @@
 .stack-work/
 *~
+RooLexer.hs
+RooParser.hs

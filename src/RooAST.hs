@@ -6,17 +6,28 @@ module RooAST where
 
 type Ident = String
 
+data BaseType
+  = IntType | BoolType
+  deriving (Show, Eq)
+  
 data TypeName
-  = BoolType
-  | IntType
-  | TypeAlias Ident
+  = Base BaseType
+  | Alias Ident
+  deriving (Show, Eq)
+  
+data Var
+  = Var TypeName [Ident]
   deriving (Show, Eq)
 
-data RecordDef
-  = Record [Decl] Ident
+data Record
+  = Record [Field] Ident
+  deriving (Show, Eq)
+  
+data Field
+  = Field BaseType Ident
   deriving (Show, Eq)
 
-data ArrayDef
+data Array
   = Array Int TypeName Ident
   deriving (Show, Eq)
 
@@ -56,10 +67,6 @@ data Expr
   | UnOpExpr UnOp Expr
   deriving (Show, Eq)
 
-data Decl
-  = Decl TypeName Ident
-  deriving (Show, Eq)
-
 data Stmt
   = Assign LValue Expr
   | Read LValue
@@ -71,15 +78,18 @@ data Stmt
   | Call Ident [Expr]
   deriving (Show, Eq)
 
-data Procedure
-  = Procedure [Parameter] [Decl] [Stmt] Ident
+data Param
+  = Param Mode TypeName Ident
   deriving (Show, Eq)
   
-data Parameter
-  = ParamVal Decl  
-  | ParamRef Decl 
+data Mode 
+  = Val | Ref
   deriving (Show, Eq)
 
+data Procedure
+  = Procedure [Param] [Var] [Stmt] Ident
+  deriving (Show, Eq)
+  
 data Program
-  = Program [RecordDef] [ArrayDef] [Procedure]
+  = Program [Record] [Array] [Procedure]
   deriving (Show, Eq)

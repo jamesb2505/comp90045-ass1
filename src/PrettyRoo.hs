@@ -2,7 +2,7 @@ module PrettyRoo (pprint) where
 
 import RooAST
 
-import Data.L (intercalate)
+import Data.List (intercalate)
 
 pprint :: Program -> String
 pprint (Program r a p) 

@@ -1,4 +1,4 @@
-<team-name>
+Skippy
 James Barnes barnesj2
 Jack Macumber jmacumber
 Isitha Subasinghe isubasinghe

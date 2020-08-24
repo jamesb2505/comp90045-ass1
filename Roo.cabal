@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e94bb497db61793f715587ab5975f90654fb9f8e9ead668193234cf1d3426916
+-- hash: ca81c9aa5a3c49866d93972d6e330760efcb91687cd2afa27a4b225826acdce3
 
 name:           Roo
 version:        0.1.0.0
@@ -31,25 +31,33 @@ library
       JoeyParser
       Lib
       PrettyJoey
+      PrettyRoo
+      RooAST
+      RooLexer
   other-modules:
       Paths_Roo
   hs-source-dirs:
       src
+  build-tools:
+      alex
   build-depends:
-      base >=4.7 && <5
+      array ==0.5.4.0
+    , base >=4.7 && <5
     , parsec ==3.1.14.0
   default-language: Haskell2010
 
 executable Roo-exe
   main-is: Main.hs
   other-modules:
-      Joey
       Paths_Roo
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-tools:
+      alex
   build-depends:
       Roo
+    , array ==0.5.4.0
     , base >=4.7 && <5
     , parsec ==3.1.14.0
   default-language: Haskell2010
@@ -62,8 +70,11 @@ test-suite Roo-test
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-tools:
+      alex
   build-depends:
       Roo
+    , array ==0.5.4.0
     , base >=4.7 && <5
     , parsec ==3.1.14.0
   default-language: Haskell2010

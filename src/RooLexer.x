@@ -1,10 +1,5 @@
 {
-module RooLexer 
-  ( runLexer
-  , Token
-  , AlexPosn
-  , PosnToken
-) where
+module RooLexer where
 }
 
 %wrapper "posn"
@@ -54,6 +49,7 @@ rules :-
   \!\=       { cTok T_neq }
   \<         { cTok T_lt }
   \<\=       { cTok T_leq }
+  \<\-       { cTok T_assign }
   \>         { cTok T_gt }
   \>\=       { cTok T_geq }
   \+         { cTok T_add }
@@ -69,6 +65,7 @@ rules :-
 data Token
   = T_and
   | T_array
+  | T_assign
   | T_boolean
   | T_call
   | T_do

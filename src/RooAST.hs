@@ -1,5 +1,5 @@
 module RooAST where
-
+import RooLexer
 -----------------------------------
 -- Specification of an AST for Roo
 -----------------------------------
@@ -11,13 +11,13 @@ data TypeName
   | IntType
   | TypeAlias Ident
   deriving (Show, Eq)
-
+  
 data RecordDef
   = Record [Decl] Ident
   deriving (Show, Eq)
 
 data ArrayDef
-  = Array Int TypeName Ident
+  = Array Int Decl
   deriving (Show, Eq)
 
 data LValue
@@ -80,6 +80,10 @@ data Parameter
   | ParamRef Decl 
   deriving (Show, Eq)
 
+data GlobalVariable
+  = GRecord RecordDef
+  | GArray ArrayDef
+  deriving (Show, Eq)
 data Program
-  = Program [RecordDef] [ArrayDef] [Procedure]
+  = Program [GlobalVariable] [Procedure]
   deriving (Show, Eq)

@@ -4,6 +4,51 @@ module RooLexer
   , Token
   , AlexPosn
   , PosnToken
+  , T_and
+  , T_array
+  , T_boolean
+  , T_call
+  , T_do
+  , T_else
+  , T_false
+  , T_fi
+  , T_if
+  , T_integer
+  , T_not
+  , T_od
+  , T_or
+  , T_procedure
+  , T_read
+  , T_record
+  , T_then
+  , T_true
+  , T_val
+  , T_while
+  , T_write
+  , T_writeln
+  , T_lbrace
+  , T_rbrace
+  , T_lbracket
+  , T_rbracket
+  , T_lparen
+  , T_rparen
+  , T_comma
+  , T_semi
+  , T_dot
+  , T_assign
+  , T_eq
+  , T_neq
+  , T_lt
+  , T_leq
+  , T_gt
+  , T_geq
+  , T_add
+  , T_sub
+  , T_mul
+  , T_div
+  , T_string
+  , T_number
+  , T_ident
 ) where
 }
 
@@ -50,6 +95,7 @@ rules :-
   \,         { cTok T_comma }
   \;         { cTok T_semi }
   \.         { cTok T_dot }
+  \<\-       { cTok T_assign }
   \=         { cTok T_eq }
   \!\=       { cTok T_neq }
   \<         { cTok T_lt }
@@ -98,6 +144,7 @@ data Token
   | T_comma
   | T_semi
   | T_dot
+  | T_assign
   | T_eq
   | T_neq 
   | T_lt

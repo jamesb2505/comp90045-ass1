@@ -19,7 +19,9 @@ extra-source-files:
 # common to point users to the README.md file.
 description: Please see the README on GitHub at <https://github.com/githubuser/Roo#readme>
 
-build-tools: [alex]
+build-tools:
+  - alex ==3.2.5
+  - happy ==1.19.12
 
 dependencies:
   - base >= 4.7 && < 5

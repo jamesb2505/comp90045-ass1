@@ -6,11 +6,9 @@ import Data.List (intercalate)
 
 pprint :: Program -> String
 pprint (Program rs as ps) 
-  = intercalate "\n" [ decs pRecord rs
-                     , decs pArray as
-                     , (if null rs && null as then "" else "\n")
-                       ++ intercalate "\n" (map pProcedure ps)
-                     ]
+  = decs pRecord rs ++ decs pArray as
+    ++ (if null rs && null as then "" else "\n")
+    ++ intercalate "\n" (map pProcedure ps)
   where
     decs _ [] = ""
     decs p ds = intercalate "\n" (map p ds)

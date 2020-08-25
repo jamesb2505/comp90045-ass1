@@ -71,52 +71,58 @@ import RooAST
 
 program : records arrays procedures { Program $1 $2 $3 }
 
-records : {- empty -} { [] }
-        | records rec { $1 ++ [$2] }
+records : records_ { reverse $1 }
+records_ : {- empty -}  { [] }
+         | records_ rec { $2:$1 }
 
 rec : record '{' fields '}' ident ';' { Record $3 $5 }
 
-fields : field            { [$1] }
-       | fields ';' field { $1 ++ [$3] }
+fields : fields_ { reverse $1 }
+fields_ : field             { [$1] }
+        | fields_ ';' field { $3:$1 }
 
 field : basetype ident { Field $1 $2 }
 
 basetype : boolean { BoolType }
          | integer { IntType }
 
-arrays : {- empty -} { [] }
-       | arrays arr  { $1 ++ [$2] }
+arrays : arrays_ { reverse $1 }
+arrays_ : {- empty -}  { [] }
+        | arrays_ arr  { $2:$1 }
 
 arr : array '[' number ']' typename ident ';' { Array $3 $5 $6 }
 
 typename : basetype { Base $1 }
          | ident    { Alias $1 }
 
-procedures : proc            { [$1] }
-           | procedures proc { $1 ++ [$2] }
+procedures : procedures_ { reverse $1 }
+procedures_ : proc             { [$1] }
+            | procedures_ proc { $2:$1 }
 
 proc : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $4 $6 $8 $2 }
 
 params : {- empty -}       { [] }
        | param             { [$1] }
-       | params1 ',' param { $1 ++ [$3] }
+       | params_ ',' param { reverse ($3:$1) }
+params_ : param             { [$1] }
+        | params_ ',' param { $3:$1 }
 
 param : typename ident     { Param Ref $1 $2 }
       | typename val ident { Param Val $1 $3 }
 
-params1 : param             { [$1] }
-        | params1 ',' param { $1 ++ [$3] }
+vars : vars_ { reverse $1 }
+vars_ : {- empty -} { [] }
+      | vars_ var   { $2:$1 }
 
-vars : {- empty -}  { [] }
-     | vars var ';' { $1 ++ [$2] }
+var : typename idents ';' { Var $1 $2 }
 
-var : typename idents { Var $1 $2 }
+idents : idents_ { reverse $1 }
+idents_ : ident             { [$1] }
+        | idents_ ',' ident { $3:$1 }
 
-idents : ident            { [$1] }
-       | idents ',' ident { $1 ++ [$3] }
-
-stmts : {- empty -} { [] }
-      | stmts stmt  { $1 ++ [$2] }  
+stmts : stmts_ { reverse $1 } 
+stmts_ : {- empty -} { [] }
+       | stmts_ stmt { $2:$1 }  
 
 stmt : lval '<-' expr ';'               { Assign $1 $3 }
      | read lval ';'                    { Read $2 }
@@ -134,10 +140,9 @@ lval : ident                        { LId $1 }
 
 exprs : {- empty -}     { [] }
       | expr            { [$1] }
-      | exprs1 ',' expr { $1 ++ [$3] }
-
-exprs1 : expr           { [$1] }
-       | exprs1 ',' expr { $1 ++ [$3] }
+      | exprs_ ',' expr { reverse ($3:$1) }
+exprs_ : expr            { [$1] }
+       | exprs_ ',' expr { $3:$1 }
 
 expr : expr or expr        { BinOpExpr Op_or $1 $3 } 
      | expr and expr       { BinOpExpr Op_and $1 $3 } 

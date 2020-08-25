@@ -146,11 +146,11 @@ instance Show Token where
   show T_comma      = "`,`"
   show T_semi       = "`;`"
   show T_dot        = "`.`"
-  show T_assign     = "<-"
+  show T_assign     = "`<-`"
   show T_eq         = "`=`"
-  show T_neq        = "!=" 
+  show T_neq        = "`!=`" 
   show T_lt         = "`<`"
-  show T_leq        = "<="
+  show T_leq        = "`<=`"
   show T_gt         = "`>`"
   show T_geq        = "`>=`"
   show T_add        = "`+`"
@@ -162,7 +162,6 @@ instance Show Token where
   show (T_ident s)  = "identifier " ++ show s
 
 type PosnToken = (AlexPosn, Token)
-
 
 tok :: (String -> Token) -> AlexPosn -> String -> PosnToken
 tok f p s = (p, f s)

@@ -1,54 +1,9 @@
 {
 module RooLexer 
   ( runLexer
-  , Token
-  , AlexPosn
+  , Token(..)
+  , AlexPosn(..)
   , PosnToken
-  , T_and
-  , T_array
-  , T_boolean
-  , T_call
-  , T_do
-  , T_else
-  , T_false
-  , T_fi
-  , T_if
-  , T_integer
-  , T_not
-  , T_od
-  , T_or
-  , T_procedure
-  , T_read
-  , T_record
-  , T_then
-  , T_true
-  , T_val
-  , T_while
-  , T_write
-  , T_writeln
-  , T_lbrace
-  , T_rbrace
-  , T_lbracket
-  , T_rbracket
-  , T_lparen
-  , T_rparen
-  , T_comma
-  , T_semi
-  , T_dot
-  , T_assign
-  , T_eq
-  , T_neq
-  , T_lt
-  , T_leq
-  , T_gt
-  , T_geq
-  , T_add
-  , T_sub
-  , T_mul
-  , T_div
-  , T_string
-  , T_number
-  , T_ident
 ) where
 }
 
@@ -158,7 +113,53 @@ data Token
   | T_string String
   | T_number Int
   | T_ident String
-  deriving (Show)
+
+instance Show Token where
+  show T_and        = "and"
+  show T_array      = "array"
+  show T_boolean    = "boolean"
+  show T_call       = "call"
+  show T_do         = "do"
+  show T_else       = "else"
+  show T_false      = "false"
+  show T_fi         = "fi"
+  show T_if         = "if"
+  show T_integer    = "integer"
+  show T_not        = "not"
+  show T_od         = "od"
+  show T_or         = "or"
+  show T_procedure  = "procedure"
+  show T_read       = "read"
+  show T_record     = "record"
+  show T_then       = "then"
+  show T_true       = "true"
+  show T_val        = "val"
+  show T_while      = "while"
+  show T_write      = "write"
+  show T_writeln    = "writeln"
+  show T_lbrace     = "`{`"
+  show T_rbrace     = "`}`"
+  show T_lbracket   = "`[`"
+  show T_rbracket   = "`]`"
+  show T_lparen     = "`(`"
+  show T_rparen     = "`)`"
+  show T_comma      = "`,`"
+  show T_semi       = "`;`"
+  show T_dot        = "`.`"
+  show T_assign     = "<-"
+  show T_eq         = "`=`"
+  show T_neq        = "!=" 
+  show T_lt         = "`<`"
+  show T_leq        = "<="
+  show T_gt         = "`>`"
+  show T_geq        = "`>=`"
+  show T_add        = "`+`"
+  show T_sub        = "`-`"
+  show T_mul        = "`*`"
+  show T_div        = "`/`"
+  show (T_string s) = "string " ++ show s
+  show (T_number n) = "number " ++ show n
+  show (T_ident s)  = "identifier " ++ show s
 
 type PosnToken = (AlexPosn, Token)
 

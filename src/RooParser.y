@@ -162,7 +162,7 @@ expr : expr or expr        { BinOpExpr Op_or $1 $3 }
 {
 parseError :: [PosnToken] -> a
 parseError []                    = error ("Unxpected parse error")
-parseError ((AlexPn _ l c, t):_) = error ("Unxpected " ++ (show $ show t) 
+parseError ((AlexPn _ l c, t):_) = error ("Unxpected " ++ (show t) 
                                           ++ " at line " ++ show l
                                           ++ ", column " ++ show c)
 }

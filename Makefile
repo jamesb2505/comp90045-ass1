@@ -23,8 +23,8 @@ clean:
 	rm -f $(OBJ)
 
 CLEAN:
-	clean
-	rm -f $(EXE)
+	rm -f $(SRC)/*.o $(SRC)/*.hi $(APP)/*.o $(APP)/*.hi
+	rm -f $(OBJ) $(EXE)
 
 Roo: $(DEPS)
 	$(HC) $(MAIN) $^ -o $(EXE)

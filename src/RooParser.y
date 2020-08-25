@@ -12,14 +12,6 @@ import RooAST
 %tokentype { PosnToken }
 %error { parseError }
 
-%left or
-%left and
-%left not
-%nonassoc '=' '!=' '<' '<=' '>' '>='
-%left '+' '-'
-%left '*' '/'
-%left NEG
-
 %token
       and        { (_, T_and) }
       array      { (_, T_array) }
@@ -67,8 +59,13 @@ import RooAST
       number     { (_, T_number $$) }
       ident      { (_, T_ident $$) }
 
-%nonassoc '>' '<' '<=' '>=' '=' '!='
-%left '+' '-' '*' '/' and or
+%left or
+%left and
+%left not
+%nonassoc '=' '!=' '<' '<=' '>' '>='
+%left '+' '-'
+%left '*' '/'
+%left NEG
 
 %%
 

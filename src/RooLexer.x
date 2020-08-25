@@ -163,12 +163,25 @@ instance Show Token where
 
 type PosnToken = (AlexPosn, Token)
 
-runLexer :: String -> [PosnToken]
-runLexer = alexScanTokens
 
 tok :: (String -> Token) -> AlexPosn -> String -> PosnToken
 tok f p s = (p, f s)
 
 cTok :: Token -> AlexPosn -> String -> PosnToken
 cTok t p _ = (p, t)
+
+runLexer :: String -> Either String [PosnToken]
+runLexer str0 = go (alexStartPos,'\n',[],str0)
+  where go inp@(pos,_,_,str) = 
+          case alexScan inp 0 of
+            AlexEOF 
+              -> Right []
+            AlexError ((AlexPn p l c),_,_,_) 
+              -> Left $ "lexical error at line " ++ show l 
+                        ++ " column " ++ (show c) ++ ": "
+                        ++ (show . take 10 $ drop p str0) 
+            AlexSkip  inp' len     
+              -> go inp' 
+            AlexToken inp' len act 
+              -> go inp' >>= Right . (:) (act pos (take len str))
 }

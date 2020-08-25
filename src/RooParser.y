@@ -5,10 +5,12 @@ module RooParser (
 
 import RooLexer
 import RooAST
+import PrettyRoo
 
 }
 
 %name runParser
+%monad { Either String } { >>= } { return }
 %tokentype { PosnToken }
 %error { parseError }
 
@@ -161,8 +163,8 @@ expr : expr or expr        { BinOpExpr Op_or $1 $3 }
      | '(' expr ')'        { $2 }
 {
 parseError :: [PosnToken] -> a
-parseError []                    = error ("Unxpected parse error")
-parseError ((AlexPn _ l c, t):_) = error ("Unxpected " ++ (show t) 
+parseError []                    = Left "Unxpected parse error"
+parseError ((AlexPn _ l c, t):_) = Left ("Unxpected " ++ (show t) 
                                           ++ " at line " ++ show l
                                           ++ ", column " ++ show c)
 }

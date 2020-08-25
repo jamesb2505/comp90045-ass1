@@ -1,9 +1,10 @@
 module Main (main) where
 
-import JoeyParser (ast)
-import PrettyJoey (pp)
+import RooParser (runParser)
+import RooLexer (runLexer)
+import PrettyRoo (pprint)
 import System.Environment (getArgs, getProgName)
-import System.Exit (ExitCode (..), exitWith)
+import System.Exit (ExitCode(..), exitWith)
 
 data Task
   = Parse
@@ -21,28 +22,12 @@ main =
         do
           let [_, filename] = args
           input <- readFile filename
-          let output = ast input
-          case output of
-            Right tree ->
-              putStrLn (show tree)
-            Left err ->
-              do
-                putStrLn "Parse error at "
-                print err
-                exitWith (ExitFailure 2)
+          doParse show input
       Pprint ->
         do
           let [_, filename] = args
           input <- readFile filename
-          let output = ast input
-          case output of
-            Right tree ->
-              putStrLn (pp tree)
-            Left err ->
-              do
-                putStrLn "Parse error at "
-                print err
-                exitWith (ExitFailure 2)
+          doParse pprint input
 
 checkArgs :: String -> [String] -> IO Task
 checkArgs _ ['-' : _] =
@@ -57,3 +42,10 @@ checkArgs progname _ =
   do
     putStrLn ("Usage: " ++ progname ++ " [-p] filename")
     exitWith (ExitFailure 1)
+
+doParse f input =
+  case runLexer input >>= runParser of
+    Left err -> doErr err 2
+    Right parsed -> putStrLn $ f parsed
+
+doErr s i = putStrLn s >> exitWith (ExitFailure i)

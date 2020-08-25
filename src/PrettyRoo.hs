@@ -11,7 +11,7 @@ pprint (Program rs as ps)
     ++ intercalate "\n" (map pProcedure ps)
   where
     decs _ [] = ""
-    decs p ds = intercalate "\n" (map p ds)
+    decs p ds = intercalate "\n" (map p ds) ++ "\n"
 
 pStmt :: [Stmt] -> String
 pStmt ss = intercalate "\n" (pStmtL ss)

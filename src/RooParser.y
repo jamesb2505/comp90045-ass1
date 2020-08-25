@@ -1,118 +1,205 @@
 {
-module Grammar where
+module RooParser (
+  runParser
+) where
+
 import RooLexer
 import RooAST
-
 }
 
-%name parse
+%name runParser
+%monad { Either String } { >>= } { return }
 %tokentype { PosnToken }
 %error { parseError }
 
 %token
-      and               { (pos, T_and) }
-      array             { (pos, T_array) }
-      boolean           { (pos, T_boolean) }
-      call              { (pos, T_call) }
-      do                { (pos, T_do) }
-      else              { (pos, T_else) }
-      false             { (pos, T_false) }
-      fi                { (pos, T_fi) }
-      if                { (pos, T_if) } 
-      integer           { (pos, T_integer) }
-      not               { (pos, T_not) }
-      od                { (pos, T_od) }
-      or                { (pos, T_or) }
-      procedure         { (pos, T_procedure) }
-      read              { (pos, T_read) }
-      record            { (pos, T_record) }
-      then              { (pos, T_then) }
-      true              { (pos, T_true) }
-      val               { (pos, T_val) }
-      while             { (pos, T_while) }
-      write             { (pos, T_write) }
-      writeln           { (pos, T_writeln) }
-      '{'               { (pos, T_lbrace) }
-      '}'               { (pos, T_rbrace) }
-      '['               { (pos, T_lbracket) }
-      ']'               { (pos, T_rbracket) }
-      '('               { (pos, T_lparen) }
-      ')'               { (pos, T_rparen) }
-      ','               { (pos, T_comma) }
-      ';'               { (pos, T_semi) }
-      '.'               { (pos, T_dot) }
-      '='               { (pos, T_eq) }
-      '!='              { (pos, T_neq) }
-      '<'               { (pos, T_lt) }
-      '<='              { (pos, T_leq) }
-      assign            { (pos, T_assign) }
-      '>'               { (pos, T_gt) }
-      '>='              { (pos, T_geq) }
-      '+'               { (pos, T_add) }
-      '-'               { (pos, T_sub) }
-      '*'               { (pos, T_mul) }
-      '/'               { (pos, T_div) }
-      string            { (pos, T_string $$) }
-      number            { (pos, T_number $$) }
-      ident             { (pos, T_ident $$) }
+      and        { (_, T_and) }
+      array      { (_, T_array) }
+      boolean    { (_, T_boolean) }
+      call       { (_, T_call) }
+      do         { (_, T_do) }
+      else       { (_, T_else) }
+      false      { (_, T_false) }
+      fi         { (_, T_fi) }
+      if         { (_, T_if) } 
+      integer    { (_, T_integer) }
+      not        { (_, T_not) }
+      od         { (_, T_od) }
+      or         { (_, T_or) }
+      procedure  { (_, T_procedure) }
+      read       { (_, T_read) }
+      record     { (_, T_record) }
+      then       { (_, T_then) }
+      true       { (_, T_true) }
+      val        { (_, T_val) }
+      while      { (_, T_while) }
+      write      { (_, T_write) }
+      writeln    { (_, T_writeln) }
+      '{'        { (_, T_lbrace) }
+      '}'        { (_, T_rbrace) }
+      '['        { (_, T_lbracket) }
+      ']'        { (_, T_rbracket) }
+      '('        { (_, T_lparen) }
+      ')'        { (_, T_rparen) }
+      ','        { (_, T_comma) }
+      ';'        { (_, T_semi) }
+      '.'        { (_, T_dot) }
+      '<-'       { (_, T_assign) }
+      '='        { (_, T_eq) }
+      '!='       { (_, T_neq) }
+      '<'        { (_, T_lt) }
+      '<='       { (_, T_leq) }
+      '>'        { (_, T_gt) }
+      '>='       { (_, T_geq) }
+      '+'        { (_, T_add) }
+      '-'        { (_, T_sub) }
+      '*'        { (_, T_mul) }
+      '/'        { (_, T_div) }
+      string     { (_, T_string $$) }
+      number     { (_, T_number $$) }
+      ident      { (_, T_ident $$) }
 
-%nonassoc '>' '<' '<=' '>=' '='
+%left or
+%left and
+%left not
+%nonassoc '=' '!=' '<' '<=' '>' '>='
 %left '+' '-'
 %left '*' '/'
 %left NEG
 
 %%
 
-Stmt  : LValue assign Expr ';'            { Assign $1 $3 }
-      | read LValue ';'                   { Read $2 }
-      | write Expr ';'                    { Write $2 }
-      | writeln Expr ';'                  { Writeln $2 }
-      | if Expr then stmts else stmts fi  { IfElse $2 $4 $6 }
-      | if Expr then stmts fi             { If $2 $4 }
-      | while Expr do stmts od            { While $2 $4 }
-      | call ident '(' sepExprs ')' ';'   { Call $2 $4 }
+program :: { Program }
+  : records arrays procedures { Program $1 $2 $3 }
 
-LValue      : ident                         { LId $1 }
-            | ident '.' identr              { LField $1 $3 }
-            | ident '[' Expr ']'            { LInd $1 $3 }
-            | ident '[' Expr ']' '.' identr { LIndField $1 $3 $6 }
+records :: { [Record] }
+  : records_ { reverse $1 }
+records_ :: { [Record] } 
+  : {- empty -}  { [] }
+  | records_ rec { $2:$1 }
 
-Expr  : LValue          { Lval $1 }    
-      | false           { BoolConst False }
-      | true            { BoolConst True }
-      | number          { IntConst $1 }
-      | string          { StrConst $1 }
-      | '(' Expr ')'    { $2 }
+rec :: { Record }
+  : record '{' fields '}' ident ';' { Record $3 $5 }
 
+fields :: { [Field] }
+  : fields_ { reverse $1 }
+fields_ :: { [Field] }
+  : field             { [$1] }
+  | fields_ ';' field { $3:$1 }
 
-Decl : TypeName ident ';'  { Decl $1 $2 }
+field :: { Field }
+  : basetype ident { Field $1 $2 }
 
-TypeName    : boolean   { BoolType }
-            | integer   { IntType }
-            | ident     { TypeAlias $1 }
+basetype :: { BaseType }
+  : boolean { BoolType }
+  | integer { IntType }
 
-ldecl : Decl  { [$1] }
-      | ldecl Decl { $2 : $1 }
+arrays :: { [Array] }
+  : arrays_ { reverse $1 }
+arrays_ :: { [Array] }
+  : {- empty -} { [] }
+  | arrays_ arr { $2:$1 }
 
-identr : ident    { $1 }
+arr :: { Array }
+  : array '[' number ']' typename ident ';' { Array $3 $5 $6 }
 
-stmts : {- empty -}     { [] }
-      | Stmt            { [$1] }
-      | stmts Stmt      { $2 : $1 }
+typename :: { TypeName }
+  : basetype { Base $1 }
+  | ident    { Alias $1 }
 
-sepExprs    : {- empty -}           { [] }
-            | Expr                  { [$1] }
-            | sepExprs ',' Expr     { $3 : $1 }
+procedures :: { [Procedure] }
+  : procedures_ { reverse $1 }
 
+procedures_ :: { [Procedure] }
+  : proc             { [$1] }
+  | procedures_ proc { $2:$1 }
 
-ArrayDef : array '[' number ']' Decl { Array $3 $5 }
+proc :: { Procedure }
+  : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $4 $6 $8 $2 }
 
-RecordDef : record '{' ldecl '}' ident ';' { Record $3 $5 }
+params :: { [Param] }
+  : {- empty -}       { [] }
+  | param             { [$1] }
+  | params_ ',' param { reverse ($3:$1) }
+params_ :: { [Param] }
+  : param             { [$1] }
+  | params_ ',' param { $3:$1 }
+
+param :: { Param }
+  : typename ident     { Param Ref $1 $2 }
+  | typename val ident { Param Val $1 $3 }
+
+vars :: { [Var] }
+  : vars_ { reverse $1 }
+vars_ :: { [Var] }
+  : {- empty -} { [] }
+  | vars_ var   { $2:$1 }
+
+var :: { Var }
+  : typename idents ';' { Var $1 $2 }
+
+idents :: { [Ident] }
+  : idents_ { reverse $1 }
+idents_ :: { [Ident] }
+  : ident             { [$1] }
+  | idents_ ',' ident { $3:$1 }
+
+stmts :: { [Stmt] }
+  : stmts_ { reverse $1 } 
+stmts_ :: { [Stmt] } 
+  : {- empty -} { [] }
+  | stmts_ stmt { $2:$1 }  
+
+stmt :: { Stmt }
+  : lval '<-' expr ';'               { Assign $1 $3 }
+  | read lval ';'                    { Read $2 }
+  | write expr ';'                   { Write $2 }
+  | writeln expr ';'                 { Writeln $2 }
+  | if expr then stmts else stmts fi { IfElse $2 $4 $6 }
+  | if expr then stmts fi            { If $2 $4 }
+  | while expr do stmts od           { While $2 $4 }
+  | call ident '(' exprs ')' ';'     { Call $2 $4 }
+
+lval :: { LValue }
+  : ident                        { LId $1 }
+  | ident '.' ident              { LField $1 $3 }
+  | ident '[' expr ']'           { LInd $1 $3 }
+  | ident '[' expr ']' '.' ident { LIndField $1 $3 $6 }
+
+exprs :: { [Expr] }
+  : {- empty -}     { [] }
+  | expr            { [$1] }
+  | exprs_ ',' expr { reverse ($3:$1) }
+exprs_ :: { [Expr] }
+  : expr            { [$1] }
+  | exprs_ ',' expr { $3:$1 }
+
+expr :: { Expr }
+  : expr or expr        { BinOpExpr Op_or $1 $3 } 
+  | expr and expr       { BinOpExpr Op_and $1 $3 } 
+  | not expr            { UnOpExpr Op_not $2 }
+  | expr '=' expr       { BinOpExpr Op_eq $1 $3 }
+  | expr '!=' expr      { BinOpExpr Op_neq $1 $3 }
+  | expr '<' expr       { BinOpExpr Op_ls $1 $3 }
+  | expr '<=' expr      { BinOpExpr Op_leq $1 $3 }
+  | expr '>' expr       { BinOpExpr Op_gt $1 $3 }
+  | expr '>=' expr      { BinOpExpr Op_geq $1 $3 }
+  | expr '+' expr       { BinOpExpr Op_add $1 $3 }
+  | expr '-' expr       { BinOpExpr Op_sub $1 $3 } 
+  | expr '*' expr       { BinOpExpr Op_mul $1 $3 }
+  | expr '/' expr       { BinOpExpr Op_div $1 $3 } 
+  | '-' expr %prec NEG  { UnOpExpr Op_neg $2 }
+  | lval                { Lval $1 }
+  | false               { BoolConst False }
+  | true                { BoolConst True }
+  | number              { IntConst $1 }
+  | string              { StrConst $1 }
+  | '(' expr ')'        { $2 }
 
 {
-
-parseError :: [PosnToken] -> a
-parseError x = error ("Not expecting " ++ token)
-                  where
-                        token = show x
+parseError :: [PosnToken] -> Either String a
+parseError []                    = Left "Unxpected parse error"
+parseError ((AlexPn _ l c, t):_) = Left ("Unxpected " ++ (show t) 
+                                          ++ " at line " ++ (show l)
+                                          ++ ", column " ++ (show c))
 }

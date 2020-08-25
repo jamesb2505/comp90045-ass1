@@ -1,11 +1,10 @@
 {
-module Main (
+module RooParser (
   runParser
 ) where
 
 import RooLexer
 import RooAST
-import PrettyRoo
 }
 
 %name runParser

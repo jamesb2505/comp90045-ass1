@@ -1,10 +1,15 @@
 module Main (main) where
 
-import JoeyParser (ast)
-import PrettyJoey (pp)
+import RooLexer
+import RooParser
+import RooAST
+import PrettyRoo
+
 import System.Environment (getArgs, getProgName)
 import System.Exit (ExitCode (..), exitWith)
 
+parse :: String -> Either String Program
+parse = runParser . (\(Right a) -> a) . runLexer
 data Task
   = Parse
   | Pprint
@@ -21,26 +26,24 @@ main =
         do
           let [_, filename] = args
           input <- readFile filename
-          let output = ast input
+          let output = parse input
           case output of
             Right tree ->
               putStrLn (show tree)
             Left err ->
               do
-                putStrLn "Parse error at "
                 print err
                 exitWith (ExitFailure 2)
       Pprint ->
         do
           let [_, filename] = args
           input <- readFile filename
-          let output = ast input
+          let output = parse input
           case output of
             Right tree ->
-              putStrLn (pp tree)
+              putStrLn (pprint tree)
             Left err ->
               do
-                putStrLn "Parse error at "
                 print err
                 exitWith (ExitFailure 2)
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ca81c9aa5a3c49866d93972d6e330760efcb91687cd2afa27a4b225826acdce3
+-- hash: 0050adaf69da7101d4852a079f6d64fffc98ece3190d0596a3cdcff686231bab
 
 name:           Roo
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       PrettyRoo
       RooAST
       RooLexer
+      RooParser
   other-modules:
       Paths_Roo
   hs-source-dirs:
@@ -52,7 +53,7 @@ executable Roo-exe
       Paths_Roo
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
   build-tools:
       alex
   build-depends:

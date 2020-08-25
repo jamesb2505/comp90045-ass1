@@ -12,6 +12,14 @@ import RooAST
 %tokentype { PosnToken }
 %error { parseError }
 
+%left or
+%left and
+%left not
+%nonassoc '=' '!=' '<' '<=' '>' '>='
+%left '+' '-'
+%left '*' '/'
+%left NEG
+
 %token
       and        { (_, T_and) }
       array      { (_, T_array) }
@@ -44,11 +52,11 @@ import RooAST
       ','        { (_, T_comma) }
       ';'        { (_, T_semi) }
       '.'        { (_, T_dot) }
+      '<-'       { (_, T_assign) }
       '='        { (_, T_eq) }
       '!='       { (_, T_neq) }
       '<'        { (_, T_lt) }
       '<='       { (_, T_leq) }
-      '<-'       { (_, T_assign) }
       '>'        { (_, T_gt) }
       '>='       { (_, T_geq) }
       '+'        { (_, T_add) }
@@ -134,42 +142,26 @@ exprs : {- empty -}     { [] }
 exprs1 : expr           { [$1] }
        | exprs1 ',' expr { $1 ++ [$3] }
 
-expr : expr0 { $1 }
-
-expr0 : expr0 or expr1 { BinOpExpr Op_or $1 $3 } 
-      | expr1          { $1 }
-
-expr1 : expr1 and expr2 { BinOpExpr Op_and $1 $3 } 
-      | expr2           { $1 }
-
-expr2 : not expr2 { UnOpExpr Op_not $2 }
-      | expr3     { $1 }
-
-expr3 : expr3 '=' expr4  { BinOpExpr Op_eq $1 $3 }
-      | expr3 '!=' expr4 { BinOpExpr Op_neq $1 $3 }
-      | expr3 '<' expr4  { BinOpExpr Op_ls $1 $3 }
-      | expr3 '<=' expr4 { BinOpExpr Op_leq $1 $3 }
-      | expr3 '>' expr4  { BinOpExpr Op_gt $1 $3 }
-      | expr3 '>=' expr4 { BinOpExpr Op_geq $1 $3 }
-      | expr4            { $1 }
-
-expr4 : expr4 '+' expr5 { BinOpExpr Op_add $1 $3 }
-      | expr4 '-' expr5 { BinOpExpr Op_sub $1 $3 } 
-      | expr5           { $1 }
-
-expr5 : expr5 '*' expr6 { BinOpExpr Op_mul $1 $3 }
-      | expr5 '/' expr6 { BinOpExpr Op_div $1 $3 } 
-      | expr6           { $1 }
-
-expr6 : '-' expr6       { UnOpExpr Op_neg $2 }
-      | expr_           { $1 }
-
-expr_ : lval         { Lval $1 }
-      | false        { BoolConst False }
-      | true         { BoolConst True }
-      | number       { IntConst $1 }
-      | string       { StrConst $1 }
-      | '(' expr ')' { $2 }
+expr : expr or expr        { BinOpExpr Op_or $1 $3 } 
+     | expr and expr       { BinOpExpr Op_and $1 $3 } 
+     | not expr            { UnOpExpr Op_not $2 }
+     | expr '=' expr       { BinOpExpr Op_eq $1 $3 }
+     | expr '!=' expr      { BinOpExpr Op_neq $1 $3 }
+     | expr '<' expr       { BinOpExpr Op_ls $1 $3 }
+     | expr '<=' expr      { BinOpExpr Op_leq $1 $3 }
+     | expr '>' expr       { BinOpExpr Op_gt $1 $3 }
+     | expr '>=' expr      { BinOpExpr Op_geq $1 $3 }
+     | expr '+' expr       { BinOpExpr Op_add $1 $3 }
+     | expr '-' expr       { BinOpExpr Op_sub $1 $3 } 
+     | expr '*' expr       { BinOpExpr Op_mul $1 $3 }
+     | expr '/' expr       { BinOpExpr Op_div $1 $3 } 
+     | '-' expr %prec NEG  { UnOpExpr Op_neg $2 }
+     | lval                { Lval $1 }
+     | false               { BoolConst False }
+     | true                { BoolConst True }
+     | number              { IntConst $1 }
+     | string              { StrConst $1 }
+     | '(' expr ')'        { $2 }
 {
 parseError :: [PosnToken] -> a
 parseError []                    = error ("Unxpected parse error")

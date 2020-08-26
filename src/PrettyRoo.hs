@@ -41,7 +41,7 @@ pExpr :: Expr -> String
 pExpr (Lval l)          = pLValue l
 pExpr (BoolConst b)     = if b then "true" else "false"
 pExpr (IntConst i)      = show i
-pExpr (StrConst s)      = show s
+pExpr (StrConst s)      = "\"" ++ s ++ "\""
 pExpr (UnOpExpr o e)    = pUnOp o ++ (if isOp e
                                       then paren (pExpr e)
                                       else (pExpr e))
@@ -102,7 +102,7 @@ pParamL :: [Param] -> String
 pParamL ds = intercalate ", " (map pParam ds)
 
 pArray :: Array -> String
-pArray (Array s t i) = "array [" ++ show s ++ "] " 
+pArray (Array s t i) = "array[" ++ show s ++ "] " 
                        ++ pTypeName t ++ " " ++ i ++ ";"
 
 pRecord :: Record -> String

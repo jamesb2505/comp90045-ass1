@@ -9,22 +9,27 @@ SRC = src
 
 _MAIN = Main.hs
 MAIN  = $(patsubst %,$(APP)/%,$(_MAIN))
-_OBJ  = RooLexer.hs RooParser.hs
-OBJ   = $(patsubst %,$(SRC)/%,$(_OBJ))
+_GEN  = RooLexer.hs RooParser.hs
+GEN   = $(patsubst %,$(SRC)/%,$(_GEN))
 _DEPS = RooAST.hs PrettyRoo.hs 
-DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(OBJ)
+DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(GEN)
 
-.PHONY: all clean CLEAN
+.PHONY: all gen clean CLEAN cleangen
 
 all: $(EXE)
 
+gen: $(GEN)
+
 clean:
 	rm -f $(SRC)/*.o $(SRC)/*.hi $(APP)/*.o $(APP)/*.hi
-	rm -f $(OBJ)
 
-CLEAN:
-	rm -f $(SRC)/*.o $(SRC)/*.hi $(APP)/*.o $(APP)/*.hi
-	rm -f $(OBJ) $(EXE)
+CLEAN: clean
+	rm -f $(EXE)
+
+cleangen: 
+	rm -f $(GEN)
+
+cleanly: all clean
 
 Roo: $(DEPS)
 	$(HC) $(MAIN) $^ -o $(EXE)

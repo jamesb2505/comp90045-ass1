@@ -102,7 +102,7 @@ pParamL :: [Param] -> String
 pParamL ds = intercalate ", " (map pParam ds)
 
 pArray :: Array -> String
-pArray (Array s t i) = "array [" ++ show s ++ "] " 
+pArray (Array s t i) = "array[" ++ show s ++ "] " 
                        ++ pTypeName t ++ " " ++ i ++ ";"
 
 pRecord :: Record -> String

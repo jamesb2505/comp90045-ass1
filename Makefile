@@ -31,7 +31,7 @@ cleangen:
 
 cleanly: all clean
 
-Roo: $(DEPS)
+$(EXE): $(DEPS)
 	$(HC) $(MAIN) $^ -o $(EXE)
 
 $(SRC)/RooLexer.hs: $(SRC)/RooLexer.x

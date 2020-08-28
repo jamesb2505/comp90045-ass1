@@ -128,9 +128,12 @@ params_ :: { [Param] }
   | params_ ',' param { $3:$1 }
 
 param :: { Param }
-  : ident ident        { ParamAlias $1 $2 }
-  | basetype ident     { ParamBase Ref $1 $2 }
-  | basetype val ident { ParamBase Val $1 $3 }
+  : ident ident         { ParamAlias $1 $2 }
+  | basetype mode ident { ParamBase $1 $2 $3 }
+
+mode :: { Mode }
+  : val         { Val }
+  | {- empty -} { Ref }
 
 vars :: { [Var] }
   : vars_ { reverse $1 }
@@ -192,7 +195,7 @@ expr :: { Expr }
   | expr '*' expr      { BinOpExpr Op_mul $1 $3 }
   | expr '/' expr      { BinOpExpr Op_div $1 $3 } 
   | '-' expr %prec NEG { UnOpExpr Op_neg $2 }
-  | lval               { Lval $1 }
+  | lval               { LVal $1 }
   | false              { BoolConst False }
   | true               { BoolConst True }
   | number             { IntConst $1 }

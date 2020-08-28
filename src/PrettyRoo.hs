@@ -42,7 +42,7 @@ pStmtL ss = concatMap (map indent . pStmt') ss
     pStmt' (Call f es)      = [ "call " ++ f ++ "(" ++ pExprL es ++ ");" ]
 
 pExpr :: Expr -> String
-pExpr (Lval l)          = pLValue l
+pExpr (LVal l)          = pLValue l
 pExpr (BoolConst b)     = if b then "true" else "false"
 pExpr (IntConst i)      = show i
 pExpr (StrConst s)      = "\"" ++ s ++ "\""
@@ -91,7 +91,7 @@ pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
 pProcedure :: Procedure -> String
 pProcedure (Procedure i ps vs ss) = "procedure " ++ i 
-                                      ++ " (" ++ pParamL  ps ++")\n" 
+                                      ++ " (" ++ pParamL ps ++")\n" 
                                     ++ vars vs ++ "{\n" ++ pStmt ss ++ "}"
   where 
     vars [] = []
@@ -102,8 +102,11 @@ pVar (Var t is) = pTypeName t ++ " " ++ intercalate ", " is
 
 pParam :: Param -> String
 pParam (ParamAlias t i)    = t ++ " " ++ i
-pParam (ParamBase Val t i) = pBaseType t ++ " val " ++ i
-pParam (ParamBase Ref t i) = pBaseType t ++ " " ++ i 
+pParam (ParamBase t m i) = pBaseType t ++ pMode m ++ i
+
+pMode :: Mode -> String
+pMode Val = " val "
+pMode Ref = " "
 
 pParamL :: [Param] -> String
 pParamL ds = intercalate ", " (map pParam ds)

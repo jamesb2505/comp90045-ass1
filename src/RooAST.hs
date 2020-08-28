@@ -4,6 +4,8 @@ module RooAST where
 -- Specification of an AST for Roo
 -----------------------------------
 
+type Ident = String
+
 -- root of AST
 data Program
   = Program [Record] [Array] [Procedure]
@@ -25,7 +27,15 @@ data Procedure
   = Procedure Ident [Param] [Var] [Stmt]
   deriving (Show, Eq)
 
-type Ident = String
+data Param
+  = ParamAlias Ident Ident
+  | ParamBase BaseType Mode Ident
+  deriving (Show, Eq)
+  
+data Mode 
+  = Val 
+  | Ref
+  deriving (Show, Eq)
 
 data BaseType
   = IntType 
@@ -41,11 +51,31 @@ data Var
   = Var TypeName [Ident]
   deriving (Show, Eq)
 
+data Stmt
+  = Assign LValue Expr
+  | Read LValue
+  | Write Expr
+  | Writeln Expr
+  | If Expr [Stmt]
+  | IfElse Expr [Stmt] [Stmt]
+  | While Expr [Stmt]
+  | Call Ident [Expr]
+  deriving (Show, Eq)
+
 data LValue
   = LId Ident
   | LField Ident Ident
   | LInd Ident Expr
   | LIndField Ident Expr Ident
+  deriving (Show, Eq)   
+
+data Expr
+  = LVal LValue
+  | BoolConst Bool
+  | IntConst Int
+  | StrConst String
+  | BinOpExpr BinOp Expr Expr
+  | UnOpExpr UnOp Expr
   deriving (Show, Eq)
 
 data BinOp
@@ -66,34 +96,4 @@ data BinOp
 data UnOp
   = Op_not
   | Op_neg
-  deriving (Show, Eq)    
-
-data Expr
-  = Lval LValue
-  | BoolConst Bool
-  | IntConst Int
-  | StrConst String
-  | BinOpExpr BinOp Expr Expr
-  | UnOpExpr UnOp Expr
-  deriving (Show, Eq)
-
-data Stmt
-  = Assign LValue Expr
-  | Read LValue
-  | Write Expr
-  | Writeln Expr
-  | If Expr [Stmt]
-  | IfElse Expr [Stmt] [Stmt]
-  | While Expr [Stmt]
-  | Call Ident [Expr]
-  deriving (Show, Eq)
-
-data Param
-  = ParamAlias Ident Ident
-  | ParamBase Mode BaseType Ident
-  deriving (Show, Eq)
-  
-data Mode 
-  = Val 
-  | Ref
-  deriving (Show, Eq)
+  deriving (Show, Eq) 

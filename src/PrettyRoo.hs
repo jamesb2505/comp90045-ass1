@@ -8,13 +8,13 @@ pprint :: Program -> String
 pprint (Program rs as ps) 
   = decs pRecord rs ++ decs pArray as
     ++ (if null rs && null as then "" else "\n")
-    ++ intercalate "\n" (map pProcedure ps)
+    ++ intercalate "\n\n" (map pProcedure ps)
   where
     decs _ [] = ""
-    decs p ds = intercalate "\n" (map p ds) ++ "\n"
+    decs p ds = unlines $ map p ds
 
 pStmt :: [Stmt] -> String
-pStmt ss = intercalate "\n" (pStmtL ss)
+pStmt ss = unlines $ pStmtL ss
 
 pStmtL :: [Stmt] -> [String]
 pStmtL ss = concatMap (map indent . pStmt') ss
@@ -42,9 +42,9 @@ pExpr (Lval l)          = pLValue l
 pExpr (BoolConst b)     = if b then "true" else "false"
 pExpr (IntConst i)      = show i
 pExpr (StrConst s)      = "\"" ++ s ++ "\""
-pExpr (UnOpExpr o e)    = pUnOp o ++ (if isOp e
-                                      then paren (pExpr e)
-                                      else (pExpr e))
+pExpr (UnOpExpr o e)    = pUnOp o ++ (if isParenOp e
+                                      then paren $ pExpr e
+                                      else pExpr e)
 pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ pBinOp o
                           ++ binParen isLAssoc o r
@@ -86,7 +86,7 @@ pProcedure :: Procedure -> String
 pProcedure (Procedure ps vs ss i ) = "procedure " ++ i 
                                        ++ " (" ++ pParamL  ps ++")\n" 
                                      ++ vars vs ++ "{\n" ++ pStmt ss 
-                                     ++ if null ss then "}\n" else "\n}\n"
+                                     ++ "}"
   where 
     vars [] = []
     vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
@@ -103,11 +103,11 @@ pParamL ds = intercalate ", " (map pParam ds)
 
 pArray :: Array -> String
 pArray (Array s t i) = "array[" ++ show s ++ "] " 
-                       ++ pTypeName t ++ " " ++ i ++ ";"
+                         ++ pTypeName t ++ " " ++ i ++ ";"
 
 pRecord :: Record -> String
-pRecord (Record fs i) = "record \n" ++ indent "{ " ++ fields ++ "\n"
-                                    ++ indent "} " ++ i ++ ";"
+pRecord (Record fs i) = "record\n" ++ indent "{ " ++ fields ++ "\n"
+                                   ++ indent "} " ++ i ++ ";"
   where fields = intercalate ("\n" ++ indent "; ") (map pField fs) 
 
 pField :: Field -> String
@@ -142,7 +142,6 @@ opPrec Op_and = 4
 opPrec Op_or  = 5
 opPrec _      = 3
 
-isOp :: Expr -> Bool
-isOp (BinOpExpr _ _ _) = True
-isOp (UnOpExpr _ _)    = True
-isOp _                 = False
+isParenOp :: Expr -> Bool
+isParenOp (BinOpExpr _ _ _) = True
+isParenOp _                 = False

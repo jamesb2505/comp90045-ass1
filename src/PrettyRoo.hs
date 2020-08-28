@@ -42,9 +42,9 @@ pExpr (Lval l)          = pLValue l
 pExpr (BoolConst b)     = if b then "true" else "false"
 pExpr (IntConst i)      = show i
 pExpr (StrConst s)      = "\"" ++ s ++ "\""
-pExpr (UnOpExpr o e)    = pUnOp o ++ (if isOp e
-                                      then paren (pExpr e)
-                                      else (pExpr e))
+pExpr (UnOpExpr o e)    = pUnOp o ++ (if isParenOp e
+                                      then paren $ pExpr e
+                                      else pExpr e)
 pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ pBinOp o
                           ++ binParen isLAssoc o r
@@ -142,7 +142,6 @@ opPrec Op_and = 4
 opPrec Op_or  = 5
 opPrec _      = 3
 
-isOp :: Expr -> Bool
-isOp (BinOpExpr _ _ _) = True
-isOp (UnOpExpr _ _)    = True
-isOp _                 = False
+isParenOp :: Expr -> Bool
+isParenOp (BinOpExpr _ _ _) = True
+isParenOp _                 = False

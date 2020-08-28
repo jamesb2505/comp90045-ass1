@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7f21a41c33135cbe7e52ce9827e47cc72e1124790f9f379015ae87d658f5d9f3
+-- hash: e9122cffcb29dd78408711db8738c00ad305cbae83d07dd60ac8f264dabe3879
 
 name:           Roo
 version:        0.1.0.0
@@ -27,7 +27,6 @@ source-repository head
 
 library
   exposed-modules:
-      PrettyJoey
       PrettyRoo
       RooAST
       RooLexer

@@ -115,6 +115,9 @@ data Token
   | T_ident String
   deriving (Eq)
 
+-- Show Token
+-- Derived Show instance does not render well for end users.
+-- This is more friendly.
 instance Show Token where
   show T_and        = "`and`"
   show T_array      = "`array`"
@@ -164,12 +167,18 @@ instance Show Token where
 
 type PosnToken = (AlexPosn, Token)
 
+-- String -> Token, Token Builder
 tok :: (String -> Token) -> AlexPosn -> String -> PosnToken
 tok f p s = (p, f s)
 
+-- Constant Token Builder
 cTok :: Token -> AlexPosn -> String -> PosnToken
 cTok t p _ = (p, t)
 
+-- runLexer
+-- Default `alexScanTokens` inplementation does not gracefully handle errors,
+-- instead calling `error`.
+-- Returns Left on lexical error, Right on success.
 runLexer :: String -> Either String [PosnToken]
 runLexer str0 = go (alexStartPos,'\n',[],str0)
   where go inp@(pos,_,_,str) = 

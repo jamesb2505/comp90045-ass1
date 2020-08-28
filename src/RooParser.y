@@ -69,6 +69,10 @@ import RooAST
 
 %%
 
+----------------------------
+-- CFG for the Roo Language
+----------------------------
+
 program :: { Program }
   : records arrays procedures { Program $1 $2 $3 }
 
@@ -109,13 +113,12 @@ typename :: { TypeName }
 
 procedures :: { [Procedure] }
   : procedures_ { reverse $1 }
-
 procedures_ :: { [Procedure] }
   : proc             { [$1] }
   | procedures_ proc { $2:$1 }
 
 proc :: { Procedure }
-  : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $4 $6 $8 $2 }
+  : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $2 $4 $6 $8 }
 
 params :: { [Param] }
   : {- empty -}       { [] }
@@ -173,13 +176,14 @@ exprs_ :: { [Expr] }
   : expr            { [$1] }
   | exprs_ ',' expr { $3:$1 }
 
+-- operator precendence is handled as defined above
 expr :: { Expr }
   : expr or expr       { BinOpExpr Op_or $1 $3 } 
   | expr and expr      { BinOpExpr Op_and $1 $3 } 
   | not expr           { UnOpExpr Op_not $2 }
   | expr '=' expr      { BinOpExpr Op_eq $1 $3 }
   | expr '!=' expr     { BinOpExpr Op_neq $1 $3 }
-  | expr '<' expr      { BinOpExpr Op_ls $1 $3 }
+  | expr '<' expr      { BinOpExpr Op_lt $1 $3 }
   | expr '<=' expr     { BinOpExpr Op_leq $1 $3 }
   | expr '>' expr      { BinOpExpr Op_gt $1 $3 }
   | expr '>=' expr     { BinOpExpr Op_geq $1 $3 }
@@ -198,7 +202,7 @@ expr :: { Expr }
 {
 parseError :: [PosnToken] -> Either String a
 parseError []                    = Left "Unxpected parse error"
-parseError ((AlexPn _ l c, t):_) = Left ("Unxpected " ++ (show t) 
-                                          ++ " at line " ++ (show l)
-                                          ++ ", column " ++ (show c))
+parseError ((AlexPn _ l c, t):_) = Left $ "Unxpected " ++ show t 
+                                          ++ " at line " ++ show l
+                                          ++ ", column " ++ show c
 }

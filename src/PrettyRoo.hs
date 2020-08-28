@@ -4,6 +4,10 @@ import RooAST
 
 import Data.List (intercalate)
 
+----------------------
+-- Printing Functions
+----------------------
+
 pprint :: Program -> String
 pprint (Program rs as ps) 
   = decs pRecord rs ++ decs pArray as
@@ -49,14 +53,17 @@ pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ pBinOp o
                           ++ binParen isLAssoc o r
   where 
-    binParen a o e = if opPrec o < prec e || (opPrec o == prec e && a o)
+    -- uses the minimal amount of required parens
+    binParen a o e = if binOpPrec o < prec e 
+                        || (binOpPrec o == prec e && a o)
                      then paren (pExpr e) 
                      else pExpr e
-    prec (BinOpExpr o _ _) = opPrec o 
+    -- general expression precedence
+    prec (BinOpExpr o _ _) = binOpPrec o 
     prec _                 = -1 
 
 pExprL :: [Expr] -> String
-pExprL es = intercalate ", " (map pExpr es)
+pExprL es = intercalate ", " $ map pExpr es
 
 pUnOp :: UnOp -> String
 pUnOp Op_not = "not "
@@ -67,7 +74,7 @@ pBinOp Op_or  = " or "
 pBinOp Op_and = " and "
 pBinOp Op_eq  = " = "
 pBinOp Op_neq = " != "
-pBinOp Op_ls  = " < "
+pBinOp Op_lt  = " < "
 pBinOp Op_leq = " <= "
 pBinOp Op_gt  = " > "
 pBinOp Op_geq = " >= "
@@ -83,10 +90,9 @@ pLValue (LInd i e)        = i ++ "[" ++ pExpr e ++ "]"
 pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 
 pProcedure :: Procedure -> String
-pProcedure (Procedure ps vs ss i ) = "procedure " ++ i 
-                                       ++ " (" ++ pParamL  ps ++")\n" 
-                                     ++ vars vs ++ "{\n" ++ pStmt ss 
-                                     ++ "}"
+pProcedure (Procedure i ps vs ss) = "procedure " ++ i 
+                                      ++ " (" ++ pParamL  ps ++")\n" 
+                                    ++ vars vs ++ "{\n" ++ pStmt ss ++ "}"
   where 
     vars [] = []
     vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
@@ -122,11 +128,19 @@ pBaseType :: BaseType -> String
 pBaseType IntType  = "integer"
 pBaseType BoolType = "boolean"
 
+-------------------
+-- Printer helpers
+-------------------
+
 indent :: String -> String
 indent s = replicate 4 ' ' ++ s
 
 paren :: String -> String
 paren s = "(" ++ s ++ ")"
+
+---------------------------------------
+-- Operator Precedence & Associativity
+---------------------------------------
 
 isLAssoc :: BinOp -> Bool
 isLAssoc _ = True
@@ -134,14 +148,14 @@ isLAssoc _ = True
 isRAssoc :: BinOp -> Bool
 isRAssoc = not . isLAssoc
 
-opPrec :: BinOp -> Int
-opPrec Op_mul = 1
-opPrec Op_div = 1
-opPrec Op_add = 2
-opPrec Op_sub = 2
-opPrec Op_and = 4
-opPrec Op_or  = 5
-opPrec _      = 3
+binOpPrec :: BinOp -> Int
+binOpPrec Op_mul = 1
+binOpPrec Op_div = 1
+binOpPrec Op_add = 2
+binOpPrec Op_sub = 2
+binOpPrec Op_and = 4
+binOpPrec Op_or  = 5
+binOpPrec _      = 3
 
 isParenOp :: Expr -> Bool
 isParenOp (BinOpExpr _ _ _) = True

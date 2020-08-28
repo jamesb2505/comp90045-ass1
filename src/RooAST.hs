@@ -4,19 +4,9 @@ module RooAST where
 -- Specification of an AST for Roo
 -----------------------------------
 
-type Ident = String
-
-data BaseType
-  = IntType | BoolType
-  deriving (Show, Eq)
-  
-data TypeName
-  = Base BaseType
-  | Alias Ident
-  deriving (Show, Eq)
-  
-data Var
-  = Var TypeName [Ident]
+-- root of AST
+data Program
+  = Program [Record] [Array] [Procedure]
   deriving (Show, Eq)
 
 data Record
@@ -31,6 +21,26 @@ data Array
   = Array Int TypeName Ident
   deriving (Show, Eq)
 
+data Procedure
+  = Procedure Ident [Param] [Var] [Stmt]
+  deriving (Show, Eq)
+
+type Ident = String
+
+data BaseType
+  = IntType 
+  | BoolType
+  deriving (Show, Eq)
+  
+data TypeName
+  = Base BaseType
+  | Alias Ident
+  deriving (Show, Eq)
+  
+data Var
+  = Var TypeName [Ident]
+  deriving (Show, Eq)
+
 data LValue
   = LId Ident
   | LField Ident Ident
@@ -43,7 +53,7 @@ data BinOp
   | Op_and
   | Op_eq
   | Op_neq
-  | Op_ls
+  | Op_lt
   | Op_leq
   | Op_gt
   | Op_geq
@@ -84,13 +94,6 @@ data Param
   deriving (Show, Eq)
   
 data Mode 
-  = Val | Ref
-  deriving (Show, Eq)
-
-data Procedure
-  = Procedure [Param] [Var] [Stmt] Ident
-  deriving (Show, Eq)
-  
-data Program
-  = Program [Record] [Array] [Procedure]
+  = Val 
+  | Ref
   deriving (Show, Eq)

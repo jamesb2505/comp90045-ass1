@@ -8,13 +8,13 @@ pprint :: Program -> String
 pprint (Program rs as ps) 
   = decs pRecord rs ++ decs pArray as
     ++ (if null rs && null as then "" else "\n")
-    ++ intercalate "\n" (map pProcedure ps)
+    ++ intercalate "\n\n" (map pProcedure ps)
   where
     decs _ [] = ""
-    decs p ds = intercalate "\n" (map p ds) ++ "\n"
+    decs p ds = unlines $ map p ds
 
 pStmt :: [Stmt] -> String
-pStmt ss = intercalate "\n" (pStmtL ss)
+pStmt ss = unlines $ pStmtL ss
 
 pStmtL :: [Stmt] -> [String]
 pStmtL ss = concatMap (map indent . pStmt') ss
@@ -86,7 +86,7 @@ pProcedure :: Procedure -> String
 pProcedure (Procedure ps vs ss i ) = "procedure " ++ i 
                                        ++ " (" ++ pParamL  ps ++")\n" 
                                      ++ vars vs ++ "{\n" ++ pStmt ss 
-                                     ++ if null ss then "}\n" else "\n}\n"
+                                     ++ "}"
   where 
     vars [] = []
     vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
@@ -103,11 +103,11 @@ pParamL ds = intercalate ", " (map pParam ds)
 
 pArray :: Array -> String
 pArray (Array s t i) = "array[" ++ show s ++ "] " 
-                       ++ pTypeName t ++ " " ++ i ++ ";"
+                         ++ pTypeName t ++ " " ++ i ++ ";"
 
 pRecord :: Record -> String
-pRecord (Record fs i) = "record \n" ++ indent "{ " ++ fields ++ "\n"
-                                    ++ indent "} " ++ i ++ ";"
+pRecord (Record fs i) = "record\n" ++ indent "{ " ++ fields ++ "\n"
+                                   ++ indent "} " ++ i ++ ";"
   where fields = intercalate ("\n" ++ indent "; ") (map pField fs) 
 
 pField :: Field -> String

@@ -95,8 +95,9 @@ pVar :: Var -> String
 pVar (Var t is) = pTypeName t ++ " " ++ intercalate ", " is
 
 pParam :: Param -> String
-pParam (Param Val t i) = pTypeName t ++ " val " ++ i
-pParam (Param Ref t i) = pTypeName t ++ " " ++ i 
+pParam (ParamAlias t i)    = t ++ " " ++ i
+pParam (ParamBase Val t i) = pBaseType t ++ " val " ++ i
+pParam (ParamBase Ref t i) = pBaseType t ++ " " ++ i 
 
 pParamL :: [Param] -> String
 pParamL ds = intercalate ", " (map pParam ds)

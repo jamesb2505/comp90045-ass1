@@ -79,7 +79,8 @@ data Stmt
   deriving (Show, Eq)
 
 data Param
-  = Param Mode TypeName Ident
+  = ParamAlias Ident Ident
+  | ParamBase Mode BaseType Ident
   deriving (Show, Eq)
   
 data Mode 

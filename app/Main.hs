@@ -2,6 +2,7 @@ module Main (main) where
 
 import RooParser (runParser)
 import RooLexer (runLexer)
+import RooAST (Program)
 import PrettyRoo (pprint)
 import System.Environment (getArgs, getProgName)
 import System.Exit (ExitCode(..), exitWith)
@@ -22,19 +23,21 @@ main = do
 
 checkArgs :: String -> [String] -> IO Task
 checkArgs _ ['-' : _] = 
-  doErr ("Missing filename") 1
+  doErr 1 "Missing filename"
 checkArgs _ ["-a", filename] =
   return Parse
 checkArgs _ ["-p", filename] =
   return Pprint
 checkArgs progname _ =
-  doErr ("Usage: " ++ progname ++ " [-p] filename") 1
+  doErr 1 $ "Usage: " ++ progname ++ " [-p] filename"
 
+doParse :: (Program -> String) -> [String] -> IO ()
 doParse f args = do
   let [_, filename] = args
   input <- readFile filename
   case runLexer input >>= runParser of
-    Left err -> doErr err 2
+    Left err -> doErr 2 err
     Right parsed -> putStrLn $ f parsed
 
-doErr s i = putStrLn s >> exitWith (ExitFailure i)
+doErr :: Int -> String -> IO a
+doErr code s = putStrLn s >> exitWith (ExitFailure code)

@@ -119,15 +119,15 @@ proc :: { Procedure }
 
 params :: { [Param] }
   : {- empty -}       { [] }
-  | param             { [$1] }
-  | params_ ',' param { reverse ($3:$1) }
+  | params_           { reverse $1 }
 params_ :: { [Param] }
   : param             { [$1] }
   | params_ ',' param { $3:$1 }
 
 param :: { Param }
-  : typename ident     { Param Ref $1 $2 }
-  | typename val ident { Param Val $1 $3 }
+  : ident ident        { ParamAlias $1 $2 }
+  | basetype ident     { ParamBase Ref $1 $2 }
+  | basetype val ident { ParamBase Val $1 $3 }
 
 vars :: { [Var] }
   : vars_ { reverse $1 }
@@ -167,34 +167,33 @@ lval :: { LValue }
   | ident '[' expr ']' '.' ident { LIndField $1 $3 $6 }
 
 exprs :: { [Expr] }
-  : {- empty -}     { [] }
-  | expr            { [$1] }
-  | exprs_ ',' expr { reverse ($3:$1) }
+  : {- empty -} { [] }
+  | exprs_      { reverse $1 }
 exprs_ :: { [Expr] }
   : expr            { [$1] }
   | exprs_ ',' expr { $3:$1 }
 
 expr :: { Expr }
-  : expr or expr        { BinOpExpr Op_or $1 $3 } 
-  | expr and expr       { BinOpExpr Op_and $1 $3 } 
-  | not expr            { UnOpExpr Op_not $2 }
-  | expr '=' expr       { BinOpExpr Op_eq $1 $3 }
-  | expr '!=' expr      { BinOpExpr Op_neq $1 $3 }
-  | expr '<' expr       { BinOpExpr Op_ls $1 $3 }
-  | expr '<=' expr      { BinOpExpr Op_leq $1 $3 }
-  | expr '>' expr       { BinOpExpr Op_gt $1 $3 }
-  | expr '>=' expr      { BinOpExpr Op_geq $1 $3 }
-  | expr '+' expr       { BinOpExpr Op_add $1 $3 }
-  | expr '-' expr       { BinOpExpr Op_sub $1 $3 } 
-  | expr '*' expr       { BinOpExpr Op_mul $1 $3 }
-  | expr '/' expr       { BinOpExpr Op_div $1 $3 } 
-  | '-' expr %prec NEG  { UnOpExpr Op_neg $2 }
-  | lval                { Lval $1 }
-  | false               { BoolConst False }
-  | true                { BoolConst True }
-  | number              { IntConst $1 }
-  | string              { StrConst $1 }
-  | '(' expr ')'        { $2 }
+  : expr or expr       { BinOpExpr Op_or $1 $3 } 
+  | expr and expr      { BinOpExpr Op_and $1 $3 } 
+  | not expr           { UnOpExpr Op_not $2 }
+  | expr '=' expr      { BinOpExpr Op_eq $1 $3 }
+  | expr '!=' expr     { BinOpExpr Op_neq $1 $3 }
+  | expr '<' expr      { BinOpExpr Op_ls $1 $3 }
+  | expr '<=' expr     { BinOpExpr Op_leq $1 $3 }
+  | expr '>' expr      { BinOpExpr Op_gt $1 $3 }
+  | expr '>=' expr     { BinOpExpr Op_geq $1 $3 }
+  | expr '+' expr      { BinOpExpr Op_add $1 $3 }
+  | expr '-' expr      { BinOpExpr Op_sub $1 $3 } 
+  | expr '*' expr      { BinOpExpr Op_mul $1 $3 }
+  | expr '/' expr      { BinOpExpr Op_div $1 $3 } 
+  | '-' expr %prec NEG { UnOpExpr Op_neg $2 }
+  | lval               { Lval $1 }
+  | false              { BoolConst False }
+  | true               { BoolConst True }
+  | number             { IntConst $1 }
+  | string             { StrConst $1 }
+  | '(' expr ')'       { $2 }
 
 {
 parseError :: [PosnToken] -> Either String a

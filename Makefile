@@ -1,8 +1,9 @@
 
-HC    = ghc
-HAPPY = happy
-ALEX  = alex
-EXE   = Roo
+HC      = ghc
+HCFLAGS = -O2
+HAPPY   = happy
+ALEX    = alex
+EXE     = Roo
 
 APP = app
 SRC = src
@@ -32,7 +33,7 @@ cleangen:
 cleanly: all clean
 
 $(EXE): $(DEPS)
-	$(HC) $(MAIN) $^ -o $(EXE)
+	$(HC) $(HCFLAGS) $(MAIN) $^ -o $(EXE)
 
 $(SRC)/RooLexer.hs: $(SRC)/RooLexer.x
 	$(ALEX) $<

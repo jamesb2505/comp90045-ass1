@@ -13,7 +13,7 @@ $digit   = 0-9
 $alpha   = [a-zA-Z] 
 $alnum   = [ $alpha $digit ]
 @ident   = $alpha [ $alnum \_ \' ]*
-@string  = \" [^ \" \t \n ]* \"
+@string  = \" ([^ \" \t \n \\ ] | \\ . )* \"
 @comment = \# .*
 @number  = $digit+
 
@@ -113,6 +113,7 @@ data Token
   | T_string String
   | T_number Int
   | T_ident String
+  deriving (Eq)
 
 instance Show Token where
   show T_and        = "`and`"
@@ -176,8 +177,8 @@ runLexer str0 = go (alexStartPos,'\n',[],str0)
             AlexEOF 
               -> Right []
             AlexError ((AlexPn p l c),_,_,_) 
-              -> Left $ "lexical error at line " ++ show l 
-                        ++ " column " ++ (show c) ++ ": "
+              -> Left $ "Lexical error at line " ++ show l 
+                        ++ ", column " ++ (show c) ++ ": "
                         ++ (show . take 10 $ drop p str0) 
             AlexSkip  inp' len     
               -> go inp' 

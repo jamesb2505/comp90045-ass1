@@ -147,7 +147,7 @@ idents_ :: { [Ident] }
 stmts :: { [Stmt] }
   : stmts_ { reverse $1 } 
 stmts_ :: { [Stmt] } 
-  : {- empty -} { [] }
+  : stmt        { [$1] }
   | stmts_ stmt { $2:$1 }  
 
 stmt :: { Stmt }

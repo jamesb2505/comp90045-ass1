@@ -18,53 +18,53 @@ $alnum   = [ $alpha $digit ]
 @number  = $digit+
 
 rules :-
-  $white+    ;
-  and        { cTok T_and }
-  array      { cTok T_array }
-  boolean    { cTok T_boolean }
-  call       { cTok T_call }
-  do         { cTok T_do }
-  else       { cTok T_else }
-  false      { cTok T_false }
-  fi         { cTok T_fi }
-  if         { cTok T_if }
-  integer    { cTok T_integer }
-  not        { cTok T_not }
-  od         { cTok T_od }
-  or         { cTok T_or }
-  procedure  { cTok T_procedure }
-  read       { cTok T_read }
-  record     { cTok T_record }
-  then       { cTok T_then }
-  true       { cTok T_true }
-  val        { cTok T_val }
-  while      { cTok T_while }
-  write      { cTok T_write }
-  writeln    { cTok T_writeln }
-  \{         { cTok T_lbrace }
-  \}         { cTok T_rbrace }
-  \[         { cTok T_lbracket }
-  \]         { cTok T_rbracket }
-  \(         { cTok T_lparen }
-  \)         { cTok T_rparen }
-  \,         { cTok T_comma }
-  \;         { cTok T_semi }
-  \.         { cTok T_dot }
-  \<\-       { cTok T_assign }
-  \=         { cTok T_eq }
-  \!\=       { cTok T_neq }
-  \<         { cTok T_lt }
-  \<\=       { cTok T_leq }
-  \>         { cTok T_gt }
-  \>\=       { cTok T_geq }
-  \+         { cTok T_add }
-  \-         { cTok T_sub }
-  \*         { cTok T_mul }
-  \/         { cTok T_div }
-  @comment   ;
-  @string    { tok (T_string . tail . init)}
-  @number    { tok (T_number . read) }
-  @ident     { tok T_ident }
+  $white+   ;
+  and       { cTok T_and }
+  array     { cTok T_array }
+  boolean   { cTok T_boolean }
+  call      { cTok T_call }
+  do        { cTok T_do }
+  else      { cTok T_else }
+  false     { cTok T_false }
+  fi        { cTok T_fi }
+  if        { cTok T_if }
+  integer   { cTok T_integer }
+  not       { cTok T_not }
+  od        { cTok T_od }
+  or        { cTok T_or }
+  procedure { cTok T_procedure }
+  read      { cTok T_read }
+  record    { cTok T_record }
+  then      { cTok T_then }
+  true      { cTok T_true }
+  val       { cTok T_val }
+  while     { cTok T_while }
+  write     { cTok T_write }
+  writeln   { cTok T_writeln }
+  \{        { cTok T_lbrace }
+  \}        { cTok T_rbrace }
+  \[        { cTok T_lbracket }
+  \]        { cTok T_rbracket }
+  \(        { cTok T_lparen }
+  \)        { cTok T_rparen }
+  \,        { cTok T_comma }
+  \;        { cTok T_semi }
+  \.        { cTok T_dot }
+  \<\-      { cTok T_assign }
+  \=        { cTok T_eq }
+  \!\=      { cTok T_neq }
+  \<        { cTok T_lt }
+  \<\=      { cTok T_leq }
+  \>        { cTok T_gt }
+  \>\=      { cTok T_geq }
+  \+        { cTok T_add }
+  \-        { cTok T_sub }
+  \*        { cTok T_mul }
+  \/        { cTok T_div }
+  @comment  ;
+  @string   { tok (T_string . tail . init)}
+  @number   { tok (T_number . read) }
+  @ident    { tok T_ident }
 
 {
 data Token
@@ -161,7 +161,7 @@ instance Show Token where
   show T_sub        = "`-`"
   show T_mul        = "`*`"
   show T_div        = "`/`"
-  show (T_string s) = "string " ++ show s
+  show (T_string s) = "string \"" ++ s ++ "\""
   show (T_number n) = "number " ++ show n
   show (T_ident s)  = "identifier " ++ show s
 
@@ -187,8 +187,8 @@ runLexer str0 = go (alexStartPos,'\n',[],str0)
               -> Right []
             AlexError ((AlexPn p l c),_,_,_) 
               -> Left $ "Lexical error at line " ++ show l 
-                        ++ ", column " ++ (show c) ++ ": "
-                        ++ (show . take 10 $ drop p str0) 
+                        ++ ", column " ++ (show c) ++ ": \""
+                        ++ (take 10 $ drop p str0) ++ "\""
             AlexSkip  inp' len     
               -> go inp' 
             AlexToken inp' len act 

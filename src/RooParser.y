@@ -13,51 +13,51 @@ import RooAST
 %error { parseError }
 
 %token
-      and        { (_, T_and) }
-      array      { (_, T_array) }
-      boolean    { (_, T_boolean) }
-      call       { (_, T_call) }
-      do         { (_, T_do) }
-      else       { (_, T_else) }
-      false      { (_, T_false) }
-      fi         { (_, T_fi) }
-      if         { (_, T_if) } 
-      integer    { (_, T_integer) }
-      not        { (_, T_not) }
-      od         { (_, T_od) }
-      or         { (_, T_or) }
-      procedure  { (_, T_procedure) }
-      read       { (_, T_read) }
-      record     { (_, T_record) }
-      then       { (_, T_then) }
-      true       { (_, T_true) }
-      val        { (_, T_val) }
-      while      { (_, T_while) }
-      write      { (_, T_write) }
-      writeln    { (_, T_writeln) }
-      '{'        { (_, T_lbrace) }
-      '}'        { (_, T_rbrace) }
-      '['        { (_, T_lbracket) }
-      ']'        { (_, T_rbracket) }
-      '('        { (_, T_lparen) }
-      ')'        { (_, T_rparen) }
-      ','        { (_, T_comma) }
-      ';'        { (_, T_semi) }
-      '.'        { (_, T_dot) }
-      '<-'       { (_, T_assign) }
-      '='        { (_, T_eq) }
-      '!='       { (_, T_neq) }
-      '<'        { (_, T_lt) }
-      '<='       { (_, T_leq) }
-      '>'        { (_, T_gt) }
-      '>='       { (_, T_geq) }
-      '+'        { (_, T_add) }
-      '-'        { (_, T_sub) }
-      '*'        { (_, T_mul) }
-      '/'        { (_, T_div) }
-      string     { (_, T_string $$) }
-      number     { (_, T_number $$) }
-      ident      { (_, T_ident $$) }
+  and        { (_, T_and) }
+  array      { (_, T_array) }
+  boolean    { (_, T_boolean) }
+  call       { (_, T_call) }
+  do         { (_, T_do) }
+  else       { (_, T_else) }
+  false      { (_, T_false) }
+  fi         { (_, T_fi) }
+  if         { (_, T_if) } 
+  integer    { (_, T_integer) }
+  not        { (_, T_not) }
+  od         { (_, T_od) }
+  or         { (_, T_or) }
+  procedure  { (_, T_procedure) }
+  read       { (_, T_read) }
+  record     { (_, T_record) }
+  then       { (_, T_then) }
+  true       { (_, T_true) }
+  val        { (_, T_val) }
+  while      { (_, T_while) }
+  write      { (_, T_write) }
+  writeln    { (_, T_writeln) }
+  '{'        { (_, T_lbrace) }
+  '}'        { (_, T_rbrace) }
+  '['        { (_, T_lbracket) }
+  ']'        { (_, T_rbracket) }
+  '('        { (_, T_lparen) }
+  ')'        { (_, T_rparen) }
+  ','        { (_, T_comma) }
+  ';'        { (_, T_semi) }
+  '.'        { (_, T_dot) }
+  '<-'       { (_, T_assign) }
+  '='        { (_, T_eq) }
+  '!='       { (_, T_neq) }
+  '<'        { (_, T_lt) }
+  '<='       { (_, T_leq) }
+  '>'        { (_, T_gt) }
+  '>='       { (_, T_geq) }
+  '+'        { (_, T_add) }
+  '-'        { (_, T_sub) }
+  '*'        { (_, T_mul) }
+  '/'        { (_, T_div) }
+  string     { (_, T_string $$) }
+  number     { (_, T_number $$) }
+  ident      { (_, T_ident $$) }
 
 %left or
 %left and
@@ -204,7 +204,7 @@ expr :: { Expr }
 
 {
 parseError :: [PosnToken] -> Either String a
-parseError []                    = Left "Unxpected parse error"
+parseError []                    = Left "Unxpected parse error at end of file"
 parseError ((AlexPn _ l c, t):_) = Left $ "Unxpected " ++ show t 
                                           ++ " at line " ++ show l
                                           ++ ", column " ++ show c

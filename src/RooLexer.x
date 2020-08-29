@@ -15,7 +15,7 @@ $alnum   = [ $alpha $digit ]
 @ident   = $alpha [ $alnum \_ \' ]*
 @string  = \" ([^ \" \t \n \\ ] | \\ . )* \"
 @comment = \# .*
-@number  = \-? $digit+
+@number  = $digit+
 
 rules :-
   $white+   ;

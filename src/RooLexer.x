@@ -15,7 +15,7 @@ $alnum   = [ $alpha $digit ]
 @ident   = $alpha [ $alnum \_ \' ]*
 @string  = \" ([^ \" \t \n \\ ] | \\ . )* \"
 @comment = \# .*
-@number  = $digit+
+@number  = \-? $digit+
 
 rules :-
   $white+   ;
@@ -111,7 +111,7 @@ data Token
   | T_mul
   | T_div
   | T_string String
-  | T_number Int
+  | T_number Integer
   | T_ident String
   deriving (Eq)
 

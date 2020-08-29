@@ -97,3 +97,28 @@ data UnOp
   = Op_not
   | Op_neg
   deriving (Show, Eq) 
+
+class Precedence op where
+  prec :: op -> Int
+
+instance Precedence BinOp where
+  prec Op_mul = 1
+  prec Op_div = 1
+  prec Op_add = 2
+  prec Op_sub = 2
+  prec Op_and = 5
+  prec Op_or  = 6
+  prec _      = 3
+
+instance Precedence UnOp where
+  prec Op_neg = 0
+  prec Op_not = 4
+
+instance Precedence Expr where
+  prec (BinOpExpr op _ _) = prec op
+  prec (UnOpExpr op _)    = prec op
+  prec _                  = -1
+
+isLAssoc, isRAssoc :: BinOp -> Bool
+isLAssoc _ = True
+isRAssoc _ = False

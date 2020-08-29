@@ -54,13 +54,9 @@ pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ binParen isLAssoc o r
   where 
     -- uses the minimal amount of required parens
-    binParen a o e = if binOpPrec o < prec e 
-                        || (binOpPrec o == prec e && a o)
-                     then paren (pExpr e) 
+    binParen a o e = if prec o < prec e || (prec o == prec e && a o)
+                     then paren $ pExpr e 
                      else pExpr e
-    -- general expression precedence
-    prec (BinOpExpr o _ _) = binOpPrec o 
-    prec _                 = -1 
 
 pExprL :: [Expr] -> String
 pExprL es = intercalate ", " $ map pExpr es
@@ -131,34 +127,15 @@ pBaseType :: BaseType -> String
 pBaseType IntType  = "integer"
 pBaseType BoolType = "boolean"
 
--------------------
--- Printer helpers
--------------------
+---------------------
+-- Printer Utilities
+---------------------
 
 indent :: String -> String
 indent s = replicate 4 ' ' ++ s
 
 paren :: String -> String
 paren s = "(" ++ s ++ ")"
-
----------------------------------------
--- Operator Precedence & Associativity
----------------------------------------
-
-isLAssoc :: BinOp -> Bool
-isLAssoc _ = True
-
-isRAssoc :: BinOp -> Bool
-isRAssoc = not . isLAssoc
-
-binOpPrec :: BinOp -> Int
-binOpPrec Op_mul = 1
-binOpPrec Op_div = 1
-binOpPrec Op_add = 2
-binOpPrec Op_sub = 2
-binOpPrec Op_and = 4
-binOpPrec Op_or  = 5
-binOpPrec _      = 3
 
 isParenOp :: Expr -> Bool
 isParenOp (BinOpExpr _ _ _) = True

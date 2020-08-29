@@ -6,17 +6,9 @@ module RooAST where
 
 type Ident = String
 
-data BaseType
-  = IntType | BoolType
-  deriving (Show, Eq)
-  
-data TypeName
-  = Base BaseType
-  | Alias Ident
-  deriving (Show, Eq)
-  
-data Var
-  = Var TypeName [Ident]
+-- root of AST
+data Program
+  = Program [Record] [Array] [Procedure]
   deriving (Show, Eq)
 
 data Record
@@ -31,40 +23,32 @@ data Array
   = Array Int TypeName Ident
   deriving (Show, Eq)
 
-data LValue
-  = LId Ident
-  | LField Ident Ident
-  | LInd Ident Expr
-  | LIndField Ident Expr Ident
+data Procedure
+  = Procedure Ident [Param] [Var] [Stmt]
   deriving (Show, Eq)
 
-data BinOp
-  = Op_or
-  | Op_and
-  | Op_eq
-  | Op_neq
-  | Op_ls
-  | Op_leq
-  | Op_gt
-  | Op_geq
-  | Op_add
-  | Op_sub
-  | Op_mul
-  | Op_div
+data Param
+  = ParamAlias Ident Ident
+  | ParamBase BaseType Mode Ident
+  deriving (Show, Eq)
+  
+data Mode 
+  = Val 
+  | Ref
   deriving (Show, Eq)
 
-data UnOp
-  = Op_not
-  | Op_neg
-  deriving (Show, Eq)    
-
-data Expr
-  = Lval LValue
-  | BoolConst Bool
-  | IntConst Int
-  | StrConst String
-  | BinOpExpr BinOp Expr Expr
-  | UnOpExpr UnOp Expr
+data BaseType
+  = IntType 
+  | BoolType
+  deriving (Show, Eq)
+  
+data TypeName
+  = Base BaseType
+  | Alias Ident
+  deriving (Show, Eq)
+  
+data Var
+  = Var TypeName [Ident]
   deriving (Show, Eq)
 
 data Stmt
@@ -78,19 +62,63 @@ data Stmt
   | Call Ident [Expr]
   deriving (Show, Eq)
 
-data Param
-  = ParamAlias Ident Ident
-  | ParamBase Mode BaseType Ident
-  deriving (Show, Eq)
-  
-data Mode 
-  = Val | Ref
+data LValue
+  = LId Ident
+  | LField Ident Ident
+  | LInd Ident Expr
+  | LIndField Ident Expr Ident
+  deriving (Show, Eq)   
+
+data Expr
+  = LVal LValue
+  | BoolConst Bool
+  | IntConst Int
+  | StrConst String
+  | BinOpExpr BinOp Expr Expr
+  | UnOpExpr UnOp Expr
   deriving (Show, Eq)
 
-data Procedure
-  = Procedure [Param] [Var] [Stmt] Ident
+data BinOp
+  = Op_or
+  | Op_and
+  | Op_eq
+  | Op_neq
+  | Op_lt
+  | Op_leq
+  | Op_gt
+  | Op_geq
+  | Op_add
+  | Op_sub
+  | Op_mul
+  | Op_div
   deriving (Show, Eq)
-  
-data Program
-  = Program [Record] [Array] [Procedure]
-  deriving (Show, Eq)
+
+data UnOp
+  = Op_not
+  | Op_neg
+  deriving (Show, Eq) 
+
+class Precedence op where
+  prec :: op -> Int
+
+instance Precedence BinOp where
+  prec Op_mul = 1
+  prec Op_div = 1
+  prec Op_add = 2
+  prec Op_sub = 2
+  prec Op_and = 5
+  prec Op_or  = 6
+  prec _      = 3
+
+instance Precedence UnOp where
+  prec Op_neg = 0
+  prec Op_not = 4
+
+instance Precedence Expr where
+  prec (BinOpExpr op _ _) = prec op
+  prec (UnOpExpr op _)    = prec op
+  prec _                  = -1
+
+isLAssoc, isRAssoc :: BinOp -> Bool
+isLAssoc _ = True
+isRAssoc _ = False

@@ -13,51 +13,51 @@ import RooAST
 %error { parseError }
 
 %token
-      and        { (_, T_and) }
-      array      { (_, T_array) }
-      boolean    { (_, T_boolean) }
-      call       { (_, T_call) }
-      do         { (_, T_do) }
-      else       { (_, T_else) }
-      false      { (_, T_false) }
-      fi         { (_, T_fi) }
-      if         { (_, T_if) } 
-      integer    { (_, T_integer) }
-      not        { (_, T_not) }
-      od         { (_, T_od) }
-      or         { (_, T_or) }
-      procedure  { (_, T_procedure) }
-      read       { (_, T_read) }
-      record     { (_, T_record) }
-      then       { (_, T_then) }
-      true       { (_, T_true) }
-      val        { (_, T_val) }
-      while      { (_, T_while) }
-      write      { (_, T_write) }
-      writeln    { (_, T_writeln) }
-      '{'        { (_, T_lbrace) }
-      '}'        { (_, T_rbrace) }
-      '['        { (_, T_lbracket) }
-      ']'        { (_, T_rbracket) }
-      '('        { (_, T_lparen) }
-      ')'        { (_, T_rparen) }
-      ','        { (_, T_comma) }
-      ';'        { (_, T_semi) }
-      '.'        { (_, T_dot) }
-      '<-'       { (_, T_assign) }
-      '='        { (_, T_eq) }
-      '!='       { (_, T_neq) }
-      '<'        { (_, T_lt) }
-      '<='       { (_, T_leq) }
-      '>'        { (_, T_gt) }
-      '>='       { (_, T_geq) }
-      '+'        { (_, T_add) }
-      '-'        { (_, T_sub) }
-      '*'        { (_, T_mul) }
-      '/'        { (_, T_div) }
-      string     { (_, T_string $$) }
-      number     { (_, T_number $$) }
-      ident      { (_, T_ident $$) }
+  and        { (_, T_and) }
+  array      { (_, T_array) }
+  boolean    { (_, T_boolean) }
+  call       { (_, T_call) }
+  do         { (_, T_do) }
+  else       { (_, T_else) }
+  false      { (_, T_false) }
+  fi         { (_, T_fi) }
+  if         { (_, T_if) } 
+  integer    { (_, T_integer) }
+  not        { (_, T_not) }
+  od         { (_, T_od) }
+  or         { (_, T_or) }
+  procedure  { (_, T_procedure) }
+  read       { (_, T_read) }
+  record     { (_, T_record) }
+  then       { (_, T_then) }
+  true       { (_, T_true) }
+  val        { (_, T_val) }
+  while      { (_, T_while) }
+  write      { (_, T_write) }
+  writeln    { (_, T_writeln) }
+  '{'        { (_, T_lbrace) }
+  '}'        { (_, T_rbrace) }
+  '['        { (_, T_lbracket) }
+  ']'        { (_, T_rbracket) }
+  '('        { (_, T_lparen) }
+  ')'        { (_, T_rparen) }
+  ','        { (_, T_comma) }
+  ';'        { (_, T_semi) }
+  '.'        { (_, T_dot) }
+  '<-'       { (_, T_assign) }
+  '='        { (_, T_eq) }
+  '!='       { (_, T_neq) }
+  '<'        { (_, T_lt) }
+  '<='       { (_, T_leq) }
+  '>'        { (_, T_gt) }
+  '>='       { (_, T_geq) }
+  '+'        { (_, T_add) }
+  '-'        { (_, T_sub) }
+  '*'        { (_, T_mul) }
+  '/'        { (_, T_div) }
+  string     { (_, T_string $$) }
+  number     { (_, T_number $$) }
+  ident      { (_, T_ident $$) }
 
 %left or
 %left and
@@ -68,6 +68,10 @@ import RooAST
 %left NEG
 
 %%
+
+----------------------------
+-- CFG for the Roo Language
+----------------------------
 
 program :: { Program }
   : records arrays procedures { Program $1 $2 $3 }
@@ -109,13 +113,12 @@ typename :: { TypeName }
 
 procedures :: { [Procedure] }
   : procedures_ { reverse $1 }
-
 procedures_ :: { [Procedure] }
   : proc             { [$1] }
   | procedures_ proc { $2:$1 }
 
 proc :: { Procedure }
-  : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $4 $6 $8 $2 }
+  : procedure ident '(' params ')' vars '{' stmts '}' { Procedure $2 $4 $6 $8 }
 
 params :: { [Param] }
   : {- empty -}       { [] }
@@ -125,9 +128,12 @@ params_ :: { [Param] }
   | params_ ',' param { $3:$1 }
 
 param :: { Param }
-  : ident ident        { ParamAlias $1 $2 }
-  | basetype ident     { ParamBase Ref $1 $2 }
-  | basetype val ident { ParamBase Val $1 $3 }
+  : ident ident         { ParamAlias $1 $2 }
+  | basetype mode ident { ParamBase $1 $2 $3 }
+
+mode :: { Mode }
+  : val         { Val }
+  | {- empty -} { Ref }
 
 vars :: { [Var] }
   : vars_ { reverse $1 }
@@ -173,13 +179,14 @@ exprs_ :: { [Expr] }
   : expr            { [$1] }
   | exprs_ ',' expr { $3:$1 }
 
+-- operator precendence is handled as defined above
 expr :: { Expr }
   : expr or expr       { BinOpExpr Op_or $1 $3 } 
   | expr and expr      { BinOpExpr Op_and $1 $3 } 
   | not expr           { UnOpExpr Op_not $2 }
   | expr '=' expr      { BinOpExpr Op_eq $1 $3 }
   | expr '!=' expr     { BinOpExpr Op_neq $1 $3 }
-  | expr '<' expr      { BinOpExpr Op_ls $1 $3 }
+  | expr '<' expr      { BinOpExpr Op_lt $1 $3 }
   | expr '<=' expr     { BinOpExpr Op_leq $1 $3 }
   | expr '>' expr      { BinOpExpr Op_gt $1 $3 }
   | expr '>=' expr     { BinOpExpr Op_geq $1 $3 }
@@ -188,7 +195,7 @@ expr :: { Expr }
   | expr '*' expr      { BinOpExpr Op_mul $1 $3 }
   | expr '/' expr      { BinOpExpr Op_div $1 $3 } 
   | '-' expr %prec NEG { UnOpExpr Op_neg $2 }
-  | lval               { Lval $1 }
+  | lval               { LVal $1 }
   | false              { BoolConst False }
   | true               { BoolConst True }
   | number             { IntConst $1 }
@@ -197,8 +204,8 @@ expr :: { Expr }
 
 {
 parseError :: [PosnToken] -> Either String a
-parseError []                    = Left "Unxpected parse error"
-parseError ((AlexPn _ l c, t):_) = Left ("Unxpected " ++ (show t) 
-                                          ++ " at line " ++ (show l)
-                                          ++ ", column " ++ (show c))
+parseError []                    = Left "Unxpected parse error at end of file"
+parseError ((AlexPn _ l c, t):_) = Left $ "Unxpected " ++ show t 
+                                          ++ " at line " ++ show l
+                                          ++ ", column " ++ show c
 }

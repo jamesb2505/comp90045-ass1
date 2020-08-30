@@ -20,7 +20,7 @@ data Field
   deriving (Show, Eq)
 
 data Array
-  = Array Int TypeName Ident
+  = Array Integer TypeName Ident
   deriving (Show, Eq)
 
 data Procedure
@@ -72,7 +72,7 @@ data LValue
 data Expr
   = LVal LValue
   | BoolConst Bool
-  | IntConst Int
+  | IntConst Integer
   | StrConst String
   | BinOpExpr BinOp Expr Expr
   | UnOpExpr UnOp Expr

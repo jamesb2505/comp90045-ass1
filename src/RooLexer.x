@@ -3,7 +3,7 @@ module RooLexer
   ( runLexer
   , Token(..)
   , AlexPosn(..)
-  , PosnToken
+  , Lexeme
 ) where
 }
 
@@ -165,32 +165,37 @@ instance Show Token where
   show (T_number n) = "number " ++ show n
   show (T_ident s)  = "identifier " ++ show s
 
-type PosnToken = (AlexPosn, Token)
+type Lexeme = (AlexPosn, Token)
 
 -- String -> Token, Token Builder
-tok :: (String -> Token) -> AlexPosn -> String -> PosnToken
+tok :: (String -> Token) -> AlexPosn -> String -> Lexeme
 tok f p s = (p, f s)
 
 -- Constant Token Builder
-cTok :: Token -> AlexPosn -> String -> PosnToken
+cTok :: Token -> AlexPosn -> String -> Lexeme
 cTok t p _ = (p, t)
 
 -- runLexer
--- Default `alexScanTokens` inplementation does not gracefully handle errors,
+-- Default `alexScanTokens` implementation does not gracefully handle errors,
 -- instead calling `error`.
 -- Returns Left on lexical error, Right on success.
-runLexer :: String -> Either String [PosnToken]
-runLexer str0 = go (alexStartPos,'\n',[],str0)
-  where go inp@(pos,_,_,str) = 
-          case alexScan inp 0 of
-            AlexEOF 
-              -> Right []
-            AlexError ((AlexPn p l c),_,_,_) 
-              -> Left $ "Lexical error at line " ++ show l 
-                        ++ ", column " ++ (show c) ++ ": \""
-                        ++ (take 10 $ drop p str0) ++ "\""
-            AlexSkip  inp' len     
-              -> go inp' 
-            AlexToken inp' len act 
-              -> go inp' >>= Right . (:) (act pos (take len str))
+runLexer :: String -> Either String [Lexeme]
+runLexer str = go (alexStartPos,'\n',[],str)
+  where 
+    go inp@(pos,_,_,s) = 
+      case alexScan inp 0 of
+        AlexEOF 
+          -> Right []
+        AlexError ((AlexPn _ l c),_,_,_) 
+          -> let ls = lines str in
+             let err = if c > 0 && l > 0 && l <= length ls
+                       then ":\n" ++ (ls !! (l - 1)) ++ "\n" 
+                            ++ replicate (c - 1) ' ' ++ "^ here"
+                       else ""
+             in Left $ "Lexical error at line " ++ show l 
+                       ++ ", column " ++ (show c) ++ err
+        AlexSkip inp' len     
+          -> go inp' 
+        AlexToken inp' len act 
+          -> go inp' >>= Right . (:) (act pos $ take len s)
 }

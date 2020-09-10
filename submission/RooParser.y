@@ -9,7 +9,7 @@ import RooAST
 
 %name runParser
 %monad { Either String } { >>= } { return }
-%tokentype { PosnToken }
+%tokentype { Lexeme }
 %error { parseError }
 
 %token
@@ -203,7 +203,7 @@ expr :: { Expr }
   | '(' expr ')'       { $2 }
 
 {
-parseError :: [PosnToken] -> Either String a
+parseError :: [Lexeme] -> Either String a
 parseError []                    = Left "Unxpected parse error at end of file"
 parseError ((AlexPn _ l c, t):_) = Left $ "Unxpected " ++ show t 
                                           ++ " at line " ++ show l

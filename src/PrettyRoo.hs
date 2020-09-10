@@ -46,7 +46,7 @@ pExpr (LVal l)          = pLValue l
 pExpr (BoolConst b)     = if b then "true" else "false"
 pExpr (IntConst i)      = show i
 pExpr (StrConst s)      = "\"" ++ s ++ "\""
-pExpr (UnOpExpr o e)    = pUnOp o ++ (if isParenOp e
+pExpr (UnOpExpr o e)    = pUnOp o ++ (if isParenOp e && prec o > prec e
                                       then paren $ pExpr e
                                       else pExpr e)
 pExpr (BinOpExpr o l r) = binParen isRAssoc o l
@@ -54,7 +54,7 @@ pExpr (BinOpExpr o l r) = binParen isRAssoc o l
                           ++ binParen isLAssoc o r
   where 
     -- uses the minimal amount of required parens
-    binParen a o e = if prec o < prec e || (prec o == prec e && a o)
+    binParen a o e = if  (prec o > prec e || (prec o == prec e && a o))
                      then paren $ pExpr e 
                      else pExpr e
 

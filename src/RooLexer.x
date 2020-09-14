@@ -13,7 +13,7 @@ $digit   = 0-9
 $alpha   = [a-zA-Z] 
 $alnum   = [ $alpha $digit ]
 @ident   = $alpha [ $alnum \_ \' ]*
-@string  = \" ([^ \" \t \n \\ ] | \\ . )* \"
+@string  = \" ([^ \" \t \n \\ ] | \\ [^ \t \n] )* \"
 @comment = \# .*
 @number  = $digit+
 

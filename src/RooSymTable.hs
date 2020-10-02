@@ -43,8 +43,9 @@ data Array
   deriving (Show, Eq)
 
 data Procedure
-  = Procedure { unParams :: Table Parameter
-              , unVars   :: Table Variable
+  = Procedure { unParams    :: Table Parameter
+              , unVars      :: Table Variable
+              , unStackSize :: Int
               }
   deriving (Show, Eq)
 
@@ -144,12 +145,14 @@ procedureTable rs as ps =
     entryProcedure :: AST.Procedure -> Either String (Entry Procedure)
     entryProcedure (AST.Procedure ident params vars _) =
       let parameters = entryParams params
-          variables  = fixOffsets (length parameters) $ entryVars vars in
+          variables  = entryVars vars in
       if checkTypes parameters variables
       then checkDuplicates (tableKeys variables ++ tableKeys parameters)
                            ("duplcate parameter/variable name in `" 
                             ++ ident ++ "`")
-                           (ident, Procedure parameters variables)
+                           (ident, Procedure parameters 
+                                     (fixOffsets (length parameters) variables) 
+                                     (stackSize (length parameters) variables))
       else Left $ "invalid type in `" ++ ident ++ "`"
     entryParams :: [AST.Param] -> [(Entry Parameter)]
     entryParams params = zipWith entryParam params [0..]
@@ -161,20 +164,23 @@ procedureTable rs as ps =
     entryVars :: [AST.Var] -> [Entry Variable]
     entryVars vars = concatMap entryVar vars
     entryVar :: AST.Var -> [Entry Variable]
-    entryVar (AST.Var t is) = map (entryVar' t) is
-    entryVar' :: AST.TypeName -> AST.Ident -> Entry Variable
-    entryVar' t i = (i, Variable t (-1)) -- fixed with fixOffsets
+    entryVar (AST.Var t is) = map (\i -> (i, Variable t (-1))) is
     checkTypes :: Table Parameter -> Table Variable -> Bool
     checkTypes params vars =
       all (validTypeName aliases) $ map (unPType . snd) params
-                                ++ map (unVType . snd) vars
+                                    ++ map (unVType . snd) vars
     aliases :: [AST.Ident]
     aliases = tableKeys rs ++ tableKeys as
     fixOffsets :: Int -> [Entry Variable] -> [Entry Variable]
-    fixOffsets offset vs = zipWith go vs (scanl (+) offset offsets)
+    fixOffsets offset vs = zipWith fixOffset vs (offsets offset vs)
       where 
-        go (ident, v) off = (ident, v { unVOffset = off })
-        offsets = map (lookupSize (PartialTable rs as) . unVType . snd) vs
+        fixOffset (ident, v) off = (ident, v { unVOffset = off })
+    offsets :: Int -> [Entry Variable] -> [Int]
+    offsets offset vs = 
+      scanl (+) offset
+        (map (lookupSize (PartialTable rs as) . unVType . snd) vs)
+    stackSize :: Int -> [Entry Variable] -> Int
+    stackSize offset vs = last $ offsets offset vs
 
 -- checkProcedures
 -- Checks that the types of all statements in all [AST.Procedure] are correct

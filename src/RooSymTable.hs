@@ -43,8 +43,8 @@ data Array
   deriving (Show, Eq)
 
 data Procedure
-  = Procedure { unParams    :: Table Parameter
-              , unVars      :: Table Variable
+  = Procedure { unParams    :: Table Param
+              , unVars      :: Table Var
               , unStackSize :: Int
               }
   deriving (Show, Eq)
@@ -55,17 +55,17 @@ data Field
           }
   deriving (Show, Eq)
 
-data Parameter 
-  = Parameter { unPType   :: AST.TypeName
-              , unMode    :: AST.Mode
-              , unPOffset :: Int
-              }
+data Param 
+  = Param { unPType   :: AST.TypeName
+          , unMode    :: AST.Mode
+          , unPOffset :: Int
+          }
   deriving (Show, Eq)
 
-data Variable 
-  = Variable { unVType   :: AST.TypeName
-             , unVOffset :: Int
-             }
+data Var 
+  = Var { unVType   :: AST.TypeName
+        , unVOffset :: Int
+        }
   deriving (Show, Eq)
 
 class SizeOf a where
@@ -101,10 +101,16 @@ recordTable rs =
       checkDuplicates (tableKeys fields)
                       ("duplicate field identifier in `" ++ ident ++ "`")
                       (ident, Record fields)
-    entryFields :: [AST.Field] -> [Entry Field]
-    entryFields fs = zipWith entryField fs [0..] 
-    entryField :: AST.Field -> Int -> Entry Field
-    entryField (AST.Field t ident) offset = (ident, Field t offset)
+
+-- entryFields
+-- Converts a [AST.Field] into a [Entry Field]
+entryFields :: [AST.Field] -> [Entry Field]
+entryFields fs = zipWith entryField fs [0..] 
+
+-- entryFields
+-- Converts an aST.Field into an Entry Field
+entryField :: AST.Field -> Int -> Entry Field
+entryField (AST.Field t ident) offset = (ident, Field t offset)
 
 -- arrayTable
 -- constructs a Table Array from a [AST.Array] and a Table Record
@@ -148,39 +154,50 @@ procedureTable rs as ps =
           variables  = entryVars vars in
       if checkTypes parameters variables
       then checkDuplicates (tableKeys variables ++ tableKeys parameters)
-                           ("duplcate parameter/variable name in `" 
+                           ("duplcate parameter/Var name in `" 
                             ++ ident ++ "`")
                            (ident, Procedure parameters 
                                      (fixOffsets (length parameters) variables) 
                                      (stackSize (length parameters) variables))
       else Left $ "invalid type in `" ++ ident ++ "`"
-    entryParams :: [AST.Param] -> [(Entry Parameter)]
-    entryParams params = zipWith entryParam params [0..]
-    entryParam :: AST.Param -> Int -> Entry Parameter
-    entryParam (AST.ParamAlias t ident) offset = 
-      (ident, Parameter (AST.Alias t) AST.Ref offset)
-    entryParam (AST.ParamBase t m ident) offset = 
-      (ident, Parameter (AST.Base t) m offset)
-    entryVars :: [AST.Var] -> [Entry Variable]
-    entryVars vars = concatMap entryVar vars
-    entryVar :: AST.Var -> [Entry Variable]
-    entryVar (AST.Var t is) = map (\i -> (i, Variable t (-1))) is
-    checkTypes :: Table Parameter -> Table Variable -> Bool
+    checkTypes :: Table Param -> Table Var -> Bool
     checkTypes params vars =
       all (validTypeName aliases) $ map (unPType . snd) params
                                     ++ map (unVType . snd) vars
     aliases :: [AST.Ident]
     aliases = tableKeys rs ++ tableKeys as
-    fixOffsets :: Int -> [Entry Variable] -> [Entry Variable]
+    fixOffsets :: Int -> [Entry Var] -> [Entry Var]
     fixOffsets offset vs = zipWith fixOffset vs (offsets offset vs)
-      where 
-        fixOffset (ident, v) off = (ident, v { unVOffset = off })
-    offsets :: Int -> [Entry Variable] -> [Int]
+      where fixOffset (ident, v) off = (ident, v { unVOffset = off })
+    offsets :: Int -> [Entry Var] -> [Int]
     offsets offset vs = 
       scanl (+) offset
         (map (lookupSize (PartialTable rs as) . unVType . snd) vs)
-    stackSize :: Int -> [Entry Variable] -> Int
+    stackSize :: Int -> [Entry Var] -> Int
     stackSize offset vs = last $ offsets offset vs
+
+-- entryParams
+-- Converts a [AST.Param] into a [Entry Param]
+entryParams :: [AST.Param] -> [Entry Param]
+entryParams params = zipWith entryParam params [0..]
+
+-- entryParam
+-- Converts an AST.Param into an Entry Param
+entryParam :: AST.Param -> Int -> Entry Param
+entryParam (AST.ParamAlias t ident) offset = 
+  (ident, Param (AST.Alias t) AST.Ref offset)
+entryParam (AST.ParamBase t m ident) offset = 
+  (ident, Param (AST.Base t) m offset)
+
+-- entryVars
+-- Converts a [AST.Var] into a [Entry Var]
+entryVars :: [AST.Var] -> [Entry Var]
+entryVars vars = concatMap entryVar vars
+
+-- entryVar
+-- Converts an AST.Var into an Entry Var
+entryVar :: AST.Var -> [Entry Var]
+entryVar (AST.Var t is) = map (\i -> (i, Var t (-1))) is
 
 -- checkProcedures
 -- Checks that the types of all statements in all [AST.Procedure] are correct

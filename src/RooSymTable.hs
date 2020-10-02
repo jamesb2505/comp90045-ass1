@@ -1,4 +1,6 @@
-module RooSymTable where
+{-# LANGUAGE FlexibleInstances #-}
+
+module RooSymbolTable where
 
 import qualified RooAST as AST
 
@@ -7,26 +9,30 @@ import qualified Control.Monad as C
 import qualified Data.Maybe as M
 
 p = AST.Program 
-      [AST.Record [AST.Field AST.IntType "i"] "r"] 
+      [AST.Record [AST.Field AST.IntType "i", AST.Field AST.IntType "b"] "r"] 
       [AST.Array 10 (AST.Alias "r") "a"] 
       [ AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst "hello")]
-      , AST.Procedure "roo" [AST.ParamBase AST.IntType AST.Ref "i"] 
-                            [AST.Var (AST.Alias "r") ["h"]]
+      , AST.Procedure "roo" [AST.ParamBase AST.IntType AST.Ref "i", AST.ParamAlias "r" "j"] 
+                            [AST.Var (AST.Alias "a") ["h", "b"]]
                             [AST.Assign (AST.LId "i") (AST.IntConst 0)]]
 
 type Entry a = (AST.Ident, a)
 
 type Table a = [Entry a]
 
-data RooSymTable 
-  = RooSymTable { unRecords    :: Table Record
+data SymbolTable 
+  = SymbolTable { unRecords    :: Table Record
                 , unArrays     :: Table Array
                 , unProcedures :: Table Procedure
                 }
   deriving (Show, Eq)
 
+data PartialTable 
+  = PartialTable (Table Record) (Table Array)
+  deriving (Show, Eq)
+
 data Record
-  = Record { unFields :: Table Field 
+  = Record { unFields :: Table Field
            }
   deriving (Show, Eq)
 
@@ -50,7 +56,6 @@ data Field
 
 data Parameter 
   = Parameter { unPType   :: AST.TypeName
-              , unPName   :: AST.Ident
               , unMode    :: AST.Mode
               , unPOffset :: Int
               }
@@ -58,101 +63,161 @@ data Parameter
 
 data Variable 
   = Variable { unVType   :: AST.TypeName
-             , unVName   :: AST.Ident
              , unVOffset :: Int
              }
   deriving (Show, Eq)
 
-symTable :: AST.Program -> Either String RooSymTable
-symTable (AST.Program rs as ps)
+class SizeOf a where
+  sizeOf :: Table Record -> Table Array -> a -> Int
+
+-- symTable
+-- constructs a SymbolTable from an AST.Program
+-- Left if there is any type errors in the program, else Right
+symbolTable :: AST.Program -> Either String SymbolTable
+symbolTable (AST.Program rs as ps)
  = do 
      records <- recordTable rs
      arrays <- arrayTable records as
      procedures <- procedureTable records arrays ps
-     let table = RooSymTable records arrays procedures
-     if checkProcedures table 
+     let table = SymbolTable records arrays procedures
+     if checkProcedures table ps
+        && checkMain table
      then Right table
      else Left "error in functions"
 
+-- recordTable
+-- constructs a Table Record from a list of AST.Records
+-- Left if there is any name conlicts in each record, else Right
 recordTable :: [AST.Record] -> Either String (Table Record)
 recordTable rs = 
   do 
-    records <- C.sequence (map convertRecord rs)
-    checkDuplicates (map fst records) "duplicate record identifier" records
+    records <- C.sequence (map entryRecord rs)
+    checkDuplicates (tableKeys records) "duplicate record identifier" records
   where
-    convertRecord :: AST.Record -> Either String (Entry Record)
-    convertRecord (AST.Record fs ident) = 
-      let fields = convertFields fs in
-      checkDuplicates (map fst fields)
+    entryRecord :: AST.Record -> Either String (Entry Record)
+    entryRecord (AST.Record fs ident) = 
+      let fields = entryFields fs in
+      checkDuplicates (tableKeys fields)
                       ("duplicate field identifier in `" ++ ident ++ "`")
                       (ident, Record fields)
-    convertFields :: [AST.Field] -> [Entry Field]
-    convertFields fs = zipWith convertField fs [0..] 
-    convertField :: AST.Field -> Int -> Entry Field
-    convertField (AST.Field t ident) offset = (ident, Field t offset)
+    entryFields :: [AST.Field] -> [Entry Field]
+    entryFields fs = zipWith entryField fs [0..] 
+    entryField :: AST.Field -> Int -> Entry Field
+    entryField (AST.Field t ident) offset = (ident, Field t offset)
 
-arrayTable
-  :: Table Record
-  -> [AST.Array] -> Either String (Table Array)
+-- arrayTable
+-- constructs a Table Array from a [AST.Array] and a Table Record
+-- Left if there is any name conlicts or size errors, else Right
+arrayTable :: Table Record -> [AST.Array] -> Either String (Table Array)
 arrayTable rs as = 
   do
-    arrays <- C.sequence $ map convertArray as
-    checkDuplicates (aliases ++ map fst arrays)
+    arrays <- C.sequence $ map entryArray as
+    checkDuplicates (aliases ++ tableKeys arrays)
                     ("duplcate type alias")
                     arrays
   where
-    convertArray :: AST.Array -> Either String (Entry Array)
-    convertArray (AST.Array size t ident) = 
+    entryArray :: AST.Array -> Either String (Entry Array)
+    entryArray (AST.Array size t ident) = 
       if size <= 0
       then Left $ "non-positive array size (" ++ show size 
                   ++ ") for `" ++ ident ++ "`"
-      else if not $ validType aliases t
+      else if not $ validTypeName aliases t
       then Left $ "invalid type for `" ++ ident ++ "`"
       else Right (ident, Array t (fromInteger size))
     aliases :: [AST.Ident]
-    aliases = map fst rs
+    aliases = tableKeys rs
 
+-- procedureTable
+-- constructs a Table Procedure from a [AST.Records], a Table Record, and a
+-- Table Array
+-- Left if there is any name conlicts, else Right
 procedureTable 
   :: Table Record -> Table Array 
   -> [AST.Procedure] -> Either String (Table Procedure)
 procedureTable rs as ps = 
   do
-    procedures <- C.sequence $ map convertProcedure ps
-    checkDuplicates (map fst procedures)
-                    "duplcate type alias"
+    procedures <- C.sequence $ map entryProcedure ps
+    checkDuplicates (tableKeys procedures)
+                    ("duplcate procedure name")
                     procedures
   where
-    convertProcedure :: AST.Procedure -> Either String (Entry Procedure)
-    convertProcedure (AST.Procedure ident params vars _) =
-      let parameters = convertParams params
-          variables  = convertVars vars in
-      checkDuplicates (map fst variables ++ map fst parameters)
-                      ("duplcate parameter/variable name in `" ++ ident ++ "`")
-                      (ident, Procedure parameters variables)
-    convertParams :: [AST.Param] -> [(Entry Parameter)]
-    convertParams params = zipWith convertParam params [0..]
-    convertParam :: AST.Param -> Int -> Entry Parameter
-    convertParam (AST.ParamAlias t ident) offset = 
-      (ident, Parameter (AST.Alias t) ident AST.Ref offset)
-    convertParam (AST.ParamBase t m ident) offset = 
-      (ident, Parameter (AST.Base t) ident m offset)
-    convertVars :: [AST.Var] -> [Entry Variable]
-    convertVars vars = zipWith (\v i -> (unVName v, v { unVOffset = i })) 
-                         (concatMap convertVar vars) [0..]
-    convertVar :: AST.Var -> [Variable]
-    convertVar (AST.Var t is) = map (convertVar' t) is
-    convertVar' :: AST.TypeName -> AST.Ident -> Variable
-    convertVar' t i = Variable t i (-1) -- fixed in convertVars
+    entryProcedure :: AST.Procedure -> Either String (Entry Procedure)
+    entryProcedure (AST.Procedure ident params vars _) =
+      let parameters = entryParams params
+          variables  = fixOffsets (length parameters) $ entryVars vars in
+      if checkTypes parameters variables
+      then checkDuplicates (tableKeys variables ++ tableKeys parameters)
+                           ("duplcate parameter/variable name in `" 
+                            ++ ident ++ "`")
+                           (ident, Procedure parameters variables)
+      else Left $ "invalid type in `" ++ ident ++ "`"
+    entryParams :: [AST.Param] -> [(Entry Parameter)]
+    entryParams params = zipWith entryParam params [0..]
+    entryParam :: AST.Param -> Int -> Entry Parameter
+    entryParam (AST.ParamAlias t ident) offset = 
+      (ident, Parameter (AST.Alias t) AST.Ref offset)
+    entryParam (AST.ParamBase t m ident) offset = 
+      (ident, Parameter (AST.Base t) m offset)
+    entryVars :: [AST.Var] -> [Entry Variable]
+    entryVars vars = concatMap entryVar vars
+    entryVar :: AST.Var -> [Entry Variable]
+    entryVar (AST.Var t is) = map (entryVar' t) is
+    entryVar' :: AST.TypeName -> AST.Ident -> Entry Variable
+    entryVar' t i = (i, Variable t (-1)) -- fixed with fixOffsets
+    checkTypes :: Table Parameter -> Table Variable -> Bool
+    checkTypes params vars =
+      all (validTypeName aliases) $ map (unPType . snd) params
+                                ++ map (unVType . snd) vars
+    aliases :: [AST.Ident]
+    aliases = tableKeys rs ++ tableKeys as
+    fixOffsets :: Int -> [Entry Variable] -> [Entry Variable]
+    fixOffsets offset vs = zipWith go vs (scanl (+) offset offsets)
+      where 
+        go (ident, v) off = (ident, v { unVOffset = off })
+        offsets = map (lookupSize (PartialTable rs as) . unVType . snd) vs
 
-checkProcedures :: RooSymTable -> Bool
-checkProcedures = const True
+-- checkProcedures
+-- Checks that the types of all statements in all [AST.Procedure] are correct
+-- using SymbolTable
+checkProcedures :: SymbolTable -> [AST.Procedure] -> Bool
+checkProcedures _ _ = True
 
+-- checkMain
+-- Check if "main" procedure in SymbolTable is correctly defined
+-- i.e. is defined and has no parameters
+checkMain :: SymbolTable -> Bool
+checkMain (SymbolTable _ _ ps) = 
+  elem "main" (tableKeys ps)
+  && (null $ unParams $ M.fromJust $ lookup "main" ps)
+
+-- checkDupicates
+-- Checks for dupicates in [c]
+-- If there is no duplicates, Right b, else Left a
 checkDuplicates :: (Ord c) => [c] -> a -> b -> Either a b 
 checkDuplicates toCheck left right = 
   if length (LU.nubOrd toCheck) == length toCheck
   then Right right
   else Left left
 
-validType :: [AST.Ident] -> AST.TypeName -> Bool
-validType _       (AST.Base _)  = True
-validType aliases (AST.Alias a) = elem a aliases
+-- tableKeys
+-- Gets the list of a tables' keys
+tableKeys :: Table a -> [AST.Ident]
+tableKeys = map fst
+
+-- validTypeName
+-- Checks if an AST.Type name is valid, given a list of aliases
+validTypeName :: [AST.Ident] -> AST.TypeName -> Bool
+validTypeName _       (AST.Base _)  = True
+validTypeName aliases (AST.Alias a) = elem a aliases
+
+-- lookupSize
+-- looks up the size of a given AST.TypeName in a PartialTable
+lookupSize :: PartialTable -> AST.TypeName -> Int
+lookupSize (PartialTable rs _) (AST.Alias ident)
+  | elem ident (tableKeys rs)
+    = length . unFields . M.fromJust $ lookup ident rs
+lookupSize st@(PartialTable _ as) (AST.Alias ident)
+  | elem ident (tableKeys as)
+    = s * lookupSize st t
+  where (Array t s) = M.fromJust $ lookup ident as
+lookupSize _ _ = 1

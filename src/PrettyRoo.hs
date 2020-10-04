@@ -42,16 +42,16 @@ pStmtL ss = concatMap (map indent . pStmt') ss
     pStmt' (Call f es)      = [ "call " ++ f ++ "(" ++ pExprL es ++ ");" ]
 
 pExpr :: Expr -> String
-pExpr (LVal l)          = pLValue l
-pExpr (BoolConst b)     = if b then "true" else "false"
-pExpr (IntConst i)      = show i
-pExpr (StrConst s)      = "\"" ++ s ++ "\""
-pExpr (UnOpExpr o e)    = pUnOp o ++ (if isParenOp e && prec o > prec e
-                                      then paren $ pExpr e
-                                      else pExpr e)
-pExpr (BinOpExpr o l r) = binParen isRAssoc o l
-                          ++ pBinOp o
-                          ++ binParen isLAssoc o r
+pExpr (LVal _ l)          = pLValue l
+pExpr (BoolConst _ b)     = if b then "true" else "false"
+pExpr (IntConst _ i)      = show i
+pExpr (StrConst _ s)      = "\"" ++ s ++ "\""
+pExpr (UnOpExpr _ o e)    = pUnOp o ++ (if isParenOp e && prec o > prec e
+                                        then paren $ pExpr e
+                                        else pExpr e)
+pExpr (BinOpExpr _ o l r) = binParen isRAssoc o l
+                            ++ pBinOp o
+                            ++ binParen isLAssoc o r
   where 
     -- uses the minimal amount of required parens
     binParen a o e = if  (prec o > prec e || (prec o == prec e && a o))

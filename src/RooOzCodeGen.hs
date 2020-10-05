@@ -239,10 +239,10 @@ genProg st (AST.Program _ _ ps) =
 genProc :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
 genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
-    let st'@(ST.Procedure params vars stackSize) = fromJust $ lookup name ps
+    let proc@(ST.Procedure params vars stackSize) = fromJust $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
-    stmts <- repeatGen (genStmt $ st { unProcedures = [ (name, st') ] }) ss
+    stmts <- repeatGen (genStmt $ st { unProcedures = (name, proc):ps }) ss
     if stackSize > 0
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize

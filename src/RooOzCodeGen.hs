@@ -239,10 +239,10 @@ genProg st (AST.Program _ _ ps) =
 genProc :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
 genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
-    let (ST.Procedure params vars stackSize) = fromJust $ lookup name ps
+    let st'@(ST.Procedure params vars stackSize) = fromJust $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
-    stmts <- repeatGen (genStmt st) ss
+    stmts <- repeatGen (genStmt $ st { unProcedures = [ (name, st') ] }) ss
     if stackSize > 0
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
@@ -268,10 +268,14 @@ genStmt st (AST.Assign l e) =
     return $ eCode 
           ++ lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
-genStmt st (AST.Read _) = -- TODO
+genStmt st (AST.Read l) = -- TODO
   do 
-    putRegister 0
-    return []
+    putRegister 1
+    lCode <- genLValue st l
+    return $ Oz_call_builtin (getReadBuiltin 
+                              $ getLValT (snd . head $ ST.unProcedures st) l)
+           : lCode
+          ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
 genStmt st (AST.Write e) =
   do 
     putRegister 0
@@ -370,11 +374,17 @@ genExpr st (AST.UnOpExpr _ op a) =
     return $ aCode
           ++ [ getUnOpCode op r r ]
 
+getBuiltinSuffix :: AST.ExprType -> String
+getBuiltinSuffix AST.BoolT = "print_bool"
+getBuiltinSuffix AST.IntT  = "print_int"
+getBuiltinSuffix AST.StrT  = "print_string"
+getBuiltinSuffix t         = error $ "no such builtin for " ++ show t
+
 getPrintBuiltin :: AST.ExprType -> String
-getPrintBuiltin AST.BoolT = "print_bool"
-getPrintBuiltin AST.IntT  = "print_int"
-getPrintBuiltin AST.StrT  = "print_string"
-getPrintBuiltin _         = error "no such builtin print"
+getPrintBuiltin t = "print_" ++ getBuiltinSuffix t
+
+getReadBuiltin :: AST.ExprType -> String
+getReadBuiltin t = "read_" ++ getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
 getBinOpCode Op_or  = Oz_or
@@ -393,6 +403,9 @@ getBinOpCode Op_div = Oz_div_int
 getUnOpCode :: AST.UnOp -> (RegNum -> RegNum -> OzCode)
 getUnOpCode Op_not = Oz_not
 getUnOpCode Op_neg = Oz_neg_int
+
+getLValT :: ST.Procedure -> AST.LValue -> AST.ExprType
+getLValT = undefined
 
 p = "procedure main () { writeln \"Hello, World!\"; }"
 ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})

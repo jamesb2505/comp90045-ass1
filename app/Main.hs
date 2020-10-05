@@ -30,7 +30,7 @@ main = do
   task <- checkArgs progname args
   case task of
     Parse -> doParse show args
-    Pprint -> doParse pprint args
+    Pprint -> doParse (pprint . snd) args
 
 -- checks for valid command line arguments
 -- returns corresonding Task if valid, else exxits program

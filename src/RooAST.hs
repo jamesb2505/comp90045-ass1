@@ -82,7 +82,7 @@ data ExprType
   = BoolT
   | IntT
   | StrT
-  | ArrayT ExprType
+  | ArrayT Ident ExprType
   | RecordT Ident
   | ErrorT
   deriving (Eq, Show)
@@ -142,6 +142,20 @@ isLVal :: Expr -> Bool
 isLVal (LVal _ _) = True
 isLVal _          = False
 
+isLId :: LValue -> Bool
+isLId (LId _) = True
+isLId _       = False
+
+getLId :: LValue -> Ident
+getLId (LId i)           = i
+getLId (LField i _)      = i
+getLId (LInd i _)        = i
+getLId (LIndField i _ _) = i
+
+getLVal :: Expr -> Maybe LValue
+getLVal (LVal _ l) = Just l
+getLVal _          = Nothing 
+
 getExprT :: Expr -> ExprType
 getExprT (LVal t _)          = t
 getExprT (BoolConst t _)     = t
@@ -168,16 +182,16 @@ isComparableT _     = False
 
 isBoolT :: ExprType -> Bool
 isBoolT BoolT = True
-isBoolT _     = True
+isBoolT _     = False
 
 isIntT :: ExprType -> Bool
 isIntT IntT = True
-isIntT _     = True
+isIntT _    = False
 
 isRecordT :: ExprType -> Bool
 isRecordT (RecordT _) = True
 isRecordT _           = False
 
 isArrayT :: ExprType -> Bool
-isArrayT (ArrayT _) = True
+isArrayT (ArrayT _ _) = True
 isArrayT _          = False

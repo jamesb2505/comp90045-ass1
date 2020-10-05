@@ -70,13 +70,22 @@ data LValue
   deriving (Show, Eq)   
 
 data Expr
-  = LVal LValue
-  | BoolConst Bool
-  | IntConst Integer
-  | StrConst String
-  | BinOpExpr BinOp Expr Expr
-  | UnOpExpr UnOp Expr
+  = LVal ExprType LValue
+  | BoolConst ExprType Bool
+  | IntConst ExprType Integer
+  | StrConst ExprType String
+  | BinOpExpr ExprType BinOp Expr Expr
+  | UnOpExpr ExprType UnOp Expr
   deriving (Show, Eq)
+
+data ExprType
+  = BoolT
+  | IntT
+  | StrT
+  | ArrayT Ident ExprType
+  | RecordT Ident
+  | ErrorT
+  deriving (Eq, Show)
 
 data BinOp
   = Op_or
@@ -115,8 +124,8 @@ instance Precedence UnOp where
   prec Op_not = 2
 
 instance Precedence Expr where
-  prec (BinOpExpr op _ _) = prec op
-  prec (UnOpExpr op _)    = prec op
+  prec (BinOpExpr _ op _ _) = prec op
+  prec (UnOpExpr _ op _)    = prec op
   prec _                  = 7
 
 isLAssoc, isRAssoc :: BinOp -> Bool
@@ -128,3 +137,61 @@ isRAssoc Op_leq = True
 isRAssoc Op_gt  = True
 isRAssoc Op_geq = True
 isRAssoc _      = False
+
+isLVal :: Expr -> Bool
+isLVal (LVal _ _) = True
+isLVal _          = False
+
+isLId :: LValue -> Bool
+isLId (LId _) = True
+isLId _       = False
+
+getLId :: LValue -> Ident
+getLId (LId i)           = i
+getLId (LField i _)      = i
+getLId (LInd i _)        = i
+getLId (LIndField i _ _) = i
+
+getLVal :: Expr -> Maybe LValue
+getLVal (LVal _ l) = Just l
+getLVal _          = Nothing 
+
+getExprT :: Expr -> ExprType
+getExprT (LVal t _)          = t
+getExprT (BoolConst t _)     = t
+getExprT (IntConst t _)      = t
+getExprT (StrConst t _)      = t
+getExprT (BinOpExpr t _ _ _) = t
+getExprT (UnOpExpr t _ _)    = t
+
+isAssignableT :: ExprType -> Bool
+isAssignableT BoolT = True
+isAssignableT IntT  = True
+isAssignableT _     = False
+
+isWriteableT :: ExprType -> Bool
+isWriteableT BoolT = True
+isWriteableT IntT  = True
+isWriteableT StrT  = True
+isWriteableT _     = False
+
+isComparableT :: ExprType -> Bool
+isComparableT BoolT = True
+isComparableT IntT  = True
+isComparableT _     = False
+
+isBoolT :: ExprType -> Bool
+isBoolT BoolT = True
+isBoolT _     = False
+
+isIntT :: ExprType -> Bool
+isIntT IntT = True
+isIntT _    = False
+
+isRecordT :: ExprType -> Bool
+isRecordT (RecordT _) = True
+isRecordT _           = False
+
+isArrayT :: ExprType -> Bool
+isArrayT (ArrayT _ _) = True
+isArrayT _          = False

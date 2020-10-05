@@ -138,5 +138,5 @@ paren :: String -> String
 paren s = "(" ++ s ++ ")"
 
 isParenOp :: Expr -> Bool
-isParenOp (BinOpExpr _ _ _) = True
+isParenOp (BinOpExpr _ _ _ _) = True
 isParenOp _                 = False

@@ -5,6 +5,7 @@ import RooSymbolTable as ST
 
 import Control.Monad.State
 import Data.List (intercalate)
+import Data.Maybe
 
 type GenState = State Gen
 
@@ -25,7 +26,7 @@ data Label
   deriving (Eq)
 
 instance (Show Label) where
-  show (ProcLabel l) = "proc_" ++ l ++ ":"
+  show (ProcLabel l) = "proc_" ++ l
   show (BranchLabel l) = "label_" ++ show l
 
 data OzCode
@@ -71,6 +72,7 @@ data OzCode
   | Oz_branch_on_true RegNum Label
   | Oz_branch_on_false RegNum Label
   | Oz_branch_uncond Label
+  | Oz_label Label
   | Oz_call Label
   | Oz_call_builtin String
   | Oz_return
@@ -100,7 +102,7 @@ instance Show OzCode where
   show (Oz_real_const r d)      
     = "  real_const " ++ intercalate ", " [show r, show d]
   show (Oz_string_const r s)    
-    = "  string_const" ++ show r ++ ", \"" ++ s ++ "\"" 
+    = "  string_const " ++ show r ++ ", \"" ++ s ++ "\"" 
   show (Oz_add_int rI rJ rK)
     = "  add_int " ++ intercalate ", " (map show [rI, rJ, rK])
   show (Oz_add_real rI rJ rK)
@@ -165,10 +167,12 @@ instance Show OzCode where
     = "  branch_on_false " ++ intercalate ", " [show r, show l]
   show (Oz_branch_uncond l)      
     = "  branch_uncond " ++ show l
+  show (Oz_label l)               
+    = show l ++ ":"
   show (Oz_call l)               
     = "  call " ++ show l
   show (Oz_call_builtin s)       
-    = "  call_builtin " ++ show s
+    = "  call_builtin " ++ s
   show (Oz_return)               
     = "  return"
   show (Oz_halt)                 
@@ -183,25 +187,131 @@ instance Show OzCode where
 nextLabel :: GenState LabelNum
 nextLabel =
   do
-    (Gen ln rn) <- get
-    put (Gen (ln + 1) rn)
+    Gen ln rn <- get
+    put $ Gen (ln + 1) rn
     return ln
+
+getRegister :: GenState RegNum
+getRegister = 
+  do
+    Gen ln r@(Reg rn) <- get
+    return r
 
 nextRegister :: GenState RegNum
 nextRegister = 
   do
-    (Gen ln r@(Reg rn)) <- get
-    put (Gen ln (Reg $ rn + 1))
+    Gen ln r@(Reg rn) <- get
+    put . Gen ln . Reg $ rn + 1
     return r
 
 putRegister :: Int -> GenState ()
 putRegister r =
   do
-    (Gen ln _) <- get
-    put (Gen ln (Reg r))
+    Gen ln _ <- get
+    put . Gen ln $ Reg r
+
+initState :: Gen
+initState = Gen 0 $ Reg 0
 
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen _ _ = Left "TODO"
+runCodeGen prog st =
+  do 
+    case evalState (genProg st prog) initState of
+      code -> return code
+      
+repeatM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
+repeatM f = liftM mconcat . mapM f
+    
+genProg :: ST.SymbolTable -> AST.Program -> GenState [OzCode]
+genProg st (AST.Program _ _ ps) =
+  do 
+    procs <- repeatM (genProc st) ps
+    return $ [ Oz_call (ProcLabel "main"), Oz_halt ] ++ procs
 
--- genProg :: AST.Program -> GenState [OzCode]
--- etc.
+genProc :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
+genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
+  do 
+    let (ST.Procedure params vars stackSize) = fromJust $ lookup name ps
+    let nParams = length params
+    stmts <- repeatM (genStmt st) ss
+    if stackSize > 0
+    then return $ Oz_label (ProcLabel name)
+                : Oz_push_stack_frame stackSize
+                -- TODO: put params on stack
+                : Oz_int_const (Reg 0) 0
+                : take stackSize [ Oz_store i $ Reg 0 | i <- [nParams..] ]
+               ++ stmts 
+               ++ [ Oz_pop_stack_frame stackSize
+                  , Oz_return
+                  ]
+    else return $ Oz_label (ProcLabel name) 
+                -- TODO: put params on stack
+                : stmts 
+               ++ [ Oz_return ]
+
+genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
+genStmt st (AST.Assign _ _) = -- TODO
+  do 
+    return []
+genStmt st (AST.Read _) = -- TODO
+  do 
+    return []
+genStmt st (AST.Write e) =
+  do 
+    expr <- genExpr st e
+    return $ expr 
+          ++ [ Oz_call_builtin "print_string" ]
+genStmt st (AST.Writeln e) =
+  do 
+    expr <- genExpr st e
+    return $ expr
+          ++ [ Oz_call_builtin "print_string"
+             , Oz_call_builtin "print_newline"
+             ]
+genStmt st (AST.If _ _) = -- TODO
+  do 
+    return []
+genStmt st (AST.IfElse _ _ _) = -- TODO
+  do 
+    return []
+genStmt st (AST.While _ _) = -- TODO
+  do 
+    return []
+genStmt st (AST.Call _ _) = -- TODO
+  do 
+    return []
+
+genExpr :: ST.SymbolTable -> AST.Expr -> GenState [OzCode]
+genExpr _ (AST.LVal _ _) = -- TODO
+  do 
+    return []
+genExpr _ (AST.BoolConst _ b) = -- TODO
+  do 
+    r <- getRegister
+    return [Oz_int_const r (if b then 1 else 0)]
+genExpr _ (AST.IntConst _ i) =
+  do 
+    r <- getRegister
+    return [Oz_int_const r (fromInteger i)]
+genExpr _ (AST.StrConst _ s) =
+  do 
+    r <- getRegister
+    return [Oz_string_const r s]
+genExpr _ (AST.BinOpExpr _ _ _ _) = -- TODO
+  do 
+    return []
+genExpr _ (AST.UnOpExpr _ _ _) = -- TODO
+  do 
+    return []
+
+p = "procedure main () { writeln \"Hello, World!\"; }"
+pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
+                       , AST.Procedure "b" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")] -- incomplete
+                       ]
+st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})
+                                                                            , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
+                                                                            ]}
+s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
+
+printCode :: Either String [OzCode] -> IO ()
+printCode (Right code) = putStr . unlines $ map show code

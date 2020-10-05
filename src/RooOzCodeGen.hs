@@ -241,20 +241,21 @@ genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
   do 
     let (ST.Procedure params vars stackSize) = fromJust $ lookup name ps
     let nParams = length params
+    let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
     stmts <- repeatGen (genStmt st) ss
     if stackSize > 0
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
-                -- TODO: put params on stack
-                : Oz_int_const (Reg 0) 0
-                : [ Oz_store (i + nParams) $ Reg 0 | i <- [ 0 .. stackSize ] ]
+                : pCode
+               ++ [ Oz_int_const (Reg 0) 0 ]
+               ++ [ Oz_store (i + nParams) $ Reg 0 | i <- [0..stackSize - 1] ]
                ++ stmts 
                ++ [ Oz_pop_stack_frame stackSize
                   , Oz_return
                   ]
     else return $ Oz_label (ProcLabel name) 
-                -- TODO: put params on stack
-                : stmts 
+                : pCode
+               ++ stmts 
                ++ [ Oz_return ]
 
 genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]

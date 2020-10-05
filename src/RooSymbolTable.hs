@@ -8,14 +8,6 @@ import qualified Data.Containers.ListUtils as LU
 import qualified Control.Monad as C
 import qualified Data.Maybe as M
 
--- p = AST.Program 
---       [AST.Record [AST.Field AST.IntType "i", AST.Field AST.IntType "b"] "r"] 
---       [AST.Array 10 (AST.Alias "r") "a"] 
---       [ AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "hello")]
---       , AST.Procedure "roo" [AST.ParamBase AST.IntType AST.Ref "i", AST.ParamAlias "r" "j"] 
---                             [AST.Var (AST.Alias "a") ["h", "b"]]
---                             [AST.Assign (AST.LId AST.IntT "i") (AST.IntConst AST.IntT 0)]]
-
 type Entry a = (AST.Ident, a)
 
 type Table a = [Entry a]

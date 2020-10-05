@@ -733,7 +733,7 @@ getArrayType _              = AST.ErrorT
 checkDuplicate :: String -> [String] -> String -> Either String ()
 checkDuplicate key keys msg =
  unless (not $ elem key keys)
-        (Left $ msg ++ ": `" ++ key ++ "`")
+        (Left $ msg ++ " `" ++ key ++ "`")
 
 -- checkDuplicates
 -- Checks if keys contains no duplicates
@@ -862,46 +862,4 @@ lookupSize st@(PartialTable _ as) (AST.Alias ident)
   where (ST.Array t s) = fromJust $ lookup ident as
 lookupSize _ _ = 1
 
-str = "record { integer a } r; array [10] integer a; array [10] integer b;"
-      ++ "\n procedure main () { write \"\"; }"
-      ++ "\n procedure test (a a, r b) { a[0] <- b.c; }"
-
-
-strGCD = "procedure main()"
-  ++ "\n  integer x, y, temp;"
-  ++ "\n  integer quotient;"
-  ++ "\n  integer remainder;"
-  ++ "\n{ "
-  ++ "\n  write \"Input two positive integers: \";"
-  ++ "\n  "
-  ++ "\n  read x;"
-  ++ "\n  read y;"
-  ++ "\n  "
-  ++ "\n  write \"\\n\";"
-  ++ "\n  "
-  ++ "\n  if x < y then"
-  ++ "\n    temp <- x;"
-  ++ "\n    x <- y;"
-  ++ "\n    y <- temp;"
-  ++ "\n  fi"
-  ++ "\n  "
-  ++ "\n  write \"The gcd of \";"
-  ++ "\n  write x;"
-  ++ "\n  write \" and \";"
-  ++ "\n  write y;"
-  ++ "\n  write \" is \";"
-  ++ "\n  "
-  ++ "\n  quotient <- x / y;"
-  ++ "\n  remainder <- x - quotient * y;"
-  ++ "\n  "
-  ++ "\n  while remainder > 0 do"
-  ++ "\n    x <- y;"
-  ++ "\n    y <- remainder;"
-  ++ "\n    quotient <- x / y;"
-  ++ "\n    remainder <- x - quotient * y;"
-  ++ "\n  od"
-  ++ "\n  "
-  ++ "\n  write y;"
-  ++ "\n  write \"\\n\";"
-  ++ "\n}"
 }

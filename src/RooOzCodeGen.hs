@@ -375,9 +375,9 @@ genExpr st (AST.UnOpExpr _ op a) =
           ++ [ getUnOpCode op r r ]
 
 getBuiltinSuffix :: AST.ExprType -> String
-getBuiltinSuffix AST.BoolT = "print_bool"
-getBuiltinSuffix AST.IntT  = "print_int"
-getBuiltinSuffix AST.StrT  = "print_string"
+getBuiltinSuffix AST.BoolT = "bool"
+getBuiltinSuffix AST.IntT  = "int"
+getBuiltinSuffix AST.StrT  = "string"
 getBuiltinSuffix t         = error $ "no such builtin for " ++ show t
 
 getPrintBuiltin :: AST.ExprType -> String

@@ -1,5 +1,8 @@
 module RooOzCodeGen where 
 
+import RooAST as AST
+import RooSymbolTable as ST
+
 import Control.Monad.State
 import Data.List (intercalate)
 
@@ -196,6 +199,9 @@ putRegister r =
   do
     (Gen ln _) <- get
     put (Gen ln (Reg r))
+
+runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
+runCodeGen _ _ = Left "TODO"
 
 -- genProg :: AST.Program -> GenState [OzCode]
 -- etc.

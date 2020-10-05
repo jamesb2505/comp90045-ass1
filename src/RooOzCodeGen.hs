@@ -88,7 +88,7 @@ instance Show OzCode where
   show (Oz_pop_stack_frame i)    
     = "  pop_stack_frame " ++ show i
   show (Oz_store s r)            
-    = "  store " ++ intercalate ", " [ show r, show s ]
+    = "  store " ++ intercalate ", " [ show s, show r ]
   show (Oz_load r s)             
     = "  load " ++ intercalate ", " [ show r, show s ]
   show (Oz_load_address r s)     
@@ -395,6 +395,7 @@ getUnOpCode Op_not = Oz_not
 getUnOpCode Op_neg = Oz_neg_int
 
 p = "procedure main () { writeln \"Hello, World!\"; }"
+ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})
 pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst IntT 0) (AST.IntConst IntT 0))]
                        , AST.Procedure "b" [] [] [ AST.Writeln (AST.BinOpExpr AST.BoolT AST.Op_and (AST.UnOpExpr AST.BoolT AST.Op_not (AST.BoolConst BoolT True)) (AST.BoolConst AST.BoolT False))
                                                  , AST.While (AST.BoolConst AST.BoolT False) [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
@@ -404,6 +405,5 @@ st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("
                                                                             , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
                                                                             ]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
-
 printCode :: Either String [OzCode] -> IO ()
 printCode (Right code) = putStr . unlines $ map show code

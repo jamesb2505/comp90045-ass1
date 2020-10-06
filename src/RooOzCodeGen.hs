@@ -4,10 +4,13 @@ import RooAST as AST
 import RooSymbolTable as ST
 
 import Control.Monad.State
+import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe
 
 type GenState = State Gen
+
+type ErrorGenState = ExceptT String GenState
 
 data Gen = Gen LabelNum RegNum
   deriving (Show, Eq)
@@ -222,24 +225,23 @@ initState :: Gen
 initState = Gen 0 $ Reg 0
 
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen prog st =
-  do 
-    case evalState (genProg st prog) initState of
-      code -> return code
+runCodeGen prog st = evalState (runExceptT (genProg st prog)) initState
       
-repeatGen :: (a -> GenState [OzCode]) -> [a] -> GenState [OzCode]
+repeatGen :: (a -> ErrorGenState [OzCode]) -> [a] -> ErrorGenState [OzCode]
 repeatGen gen = liftM concat . mapM gen
     
-genProg :: ST.SymbolTable -> AST.Program -> GenState [OzCode]
+genProg :: ST.SymbolTable -> AST.Program -> ErrorGenState [OzCode]
 genProg st (AST.Program _ _ ps) =
   do 
     procs <- repeatGen (genProc st) ps
     return $ [ Oz_call (ProcLabel "main"), Oz_halt ] ++ procs
 
-genProc :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
+genProc :: ST.SymbolTable -> AST.Procedure -> ErrorGenState [OzCode]
 genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
-    let proc@(ST.Procedure params vars stackSize) = fromJust $ lookup name ps
+    proc@(ST.Procedure params vars stackSize) 
+      <- eitherMaybe ("Unknown procedure `" ++ name ++ "`") 
+              $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
     stmts <- repeatGen (genStmt $ st { unProcedures = (name, proc):ps }) ss
@@ -247,51 +249,53 @@ genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
                 : pCode
-               ++ [ Oz_int_const (Reg 0) 0 ]
-               ++ [ Oz_store (i + nParams) $ Reg 0 | i <- [0..stackSize - 1] ]
-               ++ stmts 
-               ++ [ Oz_pop_stack_frame stackSize
-                  , Oz_return
-                  ]
+              ++ [ Oz_int_const (Reg 0) 0 ]
+              ++ [ Oz_store (i + nParams) $ Reg 0 | i <- [0..stackSize - 1] ]
+              ++ stmts 
+              ++ [ Oz_pop_stack_frame stackSize
+                , Oz_return
+                ]
     else return $ Oz_label (ProcLabel name) 
                 : pCode
-               ++ stmts 
-               ++ [ Oz_return ]
+              ++ stmts 
+              ++ [ Oz_return ]
 
-genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
+genStmt :: ST.SymbolTable -> AST.Stmt -> ErrorGenState [OzCode]
 genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
-      let lOffset = getLocalOffset st lAlias
-      let rOffset = getLocalOffset st rAlias
+      lOffset <- eitherMaybe ("Unknown parameter `" ++ lAlias ++ "`")
+                 $ getLocalOffset st lAlias
+      rOffset <- eitherMaybe ("Unknown parameter `" ++ rAlias ++ "`")
+                 $ getLocalOffset st rAlias
       return $ [ Oz_load (Reg 0) rOffset
                , Oz_store lOffset (Reg 0)
                ]
 genStmt st (AST.Assign l e) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     eCode <- genExpr st e
-    putRegister 1
+    lift $ putRegister 1
     lCode <- genLValue st l
     return $ eCode 
           ++ lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
 genStmt st (AST.Read l) =
   do 
-    putRegister 1
+    lift $ putRegister 1
     lCode <- genLValue st l
     return $ Oz_call_builtin (getReadBuiltin $ getLValT st l)
            : lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
 genStmt st (AST.Write e) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     expr <- genExpr st e
     return $ expr 
           ++ [ Oz_call_builtin . getPrintBuiltin $ AST.getExprT e ]
 genStmt st (AST.Writeln e) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     expr <- genExpr st e
     return $ expr
           ++ [ Oz_call_builtin . getPrintBuiltin $ AST.getExprT e 
@@ -299,23 +303,23 @@ genStmt st (AST.Writeln e) =
              ]
 genStmt st (AST.If e ss) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     eCode <- genExpr st e
-    putRegister 0
-    ssCode <- repeatGen (genStmt st) ss
-    endLabel <- nextLabel
+    lift $ putRegister 0
+    ssCode <- genStmts st ss
+    endLabel <- lift $ nextLabel
     return $ eCode
           ++ [ Oz_branch_on_false (Reg 0) endLabel ]
           ++ ssCode
           ++ [ Oz_label endLabel ]
 genStmt st (AST.IfElse e ts fs) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     eCode <- genExpr st e
-    tsCode <- repeatGen (genStmt st) ts
-    fsCode <- repeatGen (genStmt st) fs
-    falseLabel <- nextLabel
-    endLabel <- nextLabel
+    tsCode <- genStmts st ts
+    fsCode <- genStmts st fs
+    falseLabel <- lift $ nextLabel
+    endLabel <- lift $ nextLabel
     return $ eCode
           ++ [ Oz_branch_on_false (Reg 0) falseLabel ]
           ++ tsCode
@@ -324,12 +328,12 @@ genStmt st (AST.IfElse e ts fs) =
           ++ [ Oz_label endLabel ]
 genStmt st (AST.While e ss) =
   do 
-    putRegister 0
+    lift $ putRegister 0
     eCode <- genExpr st e
-    putRegister 0
-    ssCode <- repeatGen (genStmt st) ss
-    startLabel <- nextLabel
-    endLabel <- nextLabel
+    lift $ putRegister 0
+    ssCode <- genStmts st ss
+    startLabel <- lift $ nextLabel
+    endLabel <- lift $ nextLabel
     return $ Oz_label startLabel
            : eCode
           ++ [ Oz_branch_on_false (Reg 0) endLabel ]
@@ -339,22 +343,27 @@ genStmt st (AST.While e ss) =
              ]
 genStmt st (AST.Call _ _) = -- TODO
   do 
-    putRegister 0
+    lift $ putRegister 0
     return []
 
-genLValue :: ST.SymbolTable -> AST.LValue -> GenState [OzCode]
+genStmts :: ST.SymbolTable -> [AST.Stmt] -> ErrorGenState [OzCode]
+genStmts st ss = repeatGen (genStmt st) ss
+
+genLValue :: ST.SymbolTable -> AST.LValue -> ErrorGenState [OzCode]
 genLValue st (AST.LId alias) = 
   do 
-    let offset = getLocalOffset st alias
-    r <- nextRegister
+    offset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+              $ getLocalOffset st alias
+    r <- lift $ nextRegister
     if ST.isRef st alias 
     then return $ [ Oz_load r offset ]
     else return $ [ Oz_load_address r offset ]
 genLValue st (AST.LField alias field) = 
   do 
-    let aOffset = getLocalOffset st alias
+    aOffset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+               $ getLocalOffset st alias
     let fOffset = unFOffset $ getField (ST.getRecord st alias) field
-    r@(Reg rn) <- nextRegister
+    r@(Reg rn) <- lift $ nextRegister
     if ST.isRef st alias 
     then let r' = Reg $ rn + 1 in
          return $ [ Oz_load r aOffset
@@ -364,8 +373,9 @@ genLValue st (AST.LField alias field) =
     else return $ [ Oz_load_address r (aOffset - fOffset) ]
 genLValue st (AST.LInd alias e) = -- TODO: fix records
   do 
-    let offset = getLocalOffset st alias
-    r@(Reg rn) <- getRegister
+    offset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+              $ getLocalOffset st alias
+    r@(Reg rn) <- lift $ getRegister
     eCode <- genExpr st e
     let r' = Reg $ rn + 1
     return $ eCode
@@ -374,42 +384,42 @@ genLValue st (AST.LInd alias e) = -- TODO: fix records
              ]
 genLValue st (AST.LIndField alias e field) = -- TODO
   do 
-    putRegister 0
+    lift $ putRegister 0
     eCode <- genExpr st e
     return $ []
     
-genExpr :: ST.SymbolTable -> AST.Expr -> GenState [OzCode]
+genExpr :: ST.SymbolTable -> AST.Expr -> ErrorGenState [OzCode]
 genExpr st (AST.LVal _ lval) = 
   do 
     lCode <- genLValue st lval
     return $ lCode
 genExpr _ (AST.BoolConst _ b) =
   do 
-    r <- nextRegister
+    r <- lift $ nextRegister
     return $ [ Oz_int_const r $ if b then 1 else 0 ]
 genExpr _ (AST.IntConst _ i) =
   do 
-    r <- nextRegister
+    r <- lift $ nextRegister
     return $ [ Oz_int_const r $ fromInteger i ]
 genExpr _ (AST.StrConst _ s) =
   do 
-    r <- nextRegister
+    r <- lift $ nextRegister
     return $ [ Oz_string_const r s ]
 genExpr st (AST.BinOpExpr _ op a b) =
   do 
-    r@(Reg n) <- getRegister
+    r@(Reg n) <- lift $ getRegister
     aCode <- genExpr st a
     bCode <- genExpr st b
-    putRegister (n + 1)
-    r' <- getRegister
+    lift $ putRegister (n + 1)
+    r' <- lift $ getRegister
     return $ aCode
           ++ bCode
           ++ [ getBinOpCode op r r r' ]
 genExpr st (AST.UnOpExpr _ op a) =
   do 
-    r@(Reg n) <- getRegister
+    r@(Reg n) <- lift $ getRegister
     aCode <- genExpr st a
-    putRegister (n + 1)
+    lift $ putRegister (n + 1)
     return $ aCode
           ++ [ getUnOpCode op r r ]
 
@@ -465,3 +475,7 @@ st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
 printCode :: Either String [OzCode] -> IO ()
 printCode (Right code) = putStr . unlines $ map show code
+
+eitherMaybe :: MonadError e m => e -> Maybe a -> m a
+eitherMaybe a Nothing  = liftEither $ Left a
+eitherMaybe _ (Just b) = liftEither $ Right b

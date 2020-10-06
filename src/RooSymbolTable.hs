@@ -81,9 +81,9 @@ getField (Record fs) field = M.fromJust $ lookup field fs
 getArray :: SymbolTable -> AST.Ident -> Array
 getArray (SymbolTable _ as _) alias = M.fromJust $ lookup alias as
 
-getLocalOffset :: SymbolTable -> AST.Ident -> Int
+getLocalOffset :: SymbolTable -> AST.Ident -> Maybe Int
 getLocalOffset (SymbolTable _ _ ((_,Procedure ps vs _):_)) alias
   | isTableKey alias ps
-  = unPOffset . M.fromJust $ lookup alias ps
+    = Just . unPOffset . M.fromJust $ lookup alias ps
   | isTableKey alias vs
-  = unVOffset . M.fromJust $ lookup alias vs
+    = Just . unVOffset . M.fromJust $ lookup alias vs

@@ -232,7 +232,7 @@ genProc :: ST.SymbolTable -> AST.Procedure -> ErrorGenState [OzCode]
 genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
     proc@(ST.Procedure params vars stackSize) 
-      <- eitherMaybe ("Unknown procedure `" ++ name ++ "`") 
+      <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
               $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
@@ -256,9 +256,9 @@ genStmt :: ST.SymbolTable -> AST.Stmt -> ErrorGenState [OzCode]
 genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
-      lOffset <- eitherMaybe ("Unknown parameter `" ++ lAlias ++ "`")
+      lOffset <- maybeErr ("Unknown parameter `" ++ lAlias ++ "`")
                  $ getLocalOffset st lAlias
-      rOffset <- eitherMaybe ("Unknown parameter `" ++ rAlias ++ "`")
+      rOffset <- maybeErr ("Unknown parameter `" ++ rAlias ++ "`")
                  $ getLocalOffset st rAlias
       return $ [ Oz_load (Reg 0) rOffset
                , Oz_store lOffset (Reg 0)
@@ -347,7 +347,7 @@ genStmts st ss = repeatGen (genStmt st) ss
 genLValue :: ST.SymbolTable -> AST.LValue -> ErrorGenState [OzCode]
 genLValue st (AST.LId alias) = 
   do 
-    offset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+    offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
               $ getLocalOffset st alias
     r <- nextRegister
     if ST.isRef st alias 
@@ -355,7 +355,7 @@ genLValue st (AST.LId alias) =
     else return $ [ Oz_load_address r offset ]
 genLValue st (AST.LField alias field) = 
   do 
-    aOffset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+    aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
                $ getLocalOffset st alias
     let fOffset = unFOffset $ getField (ST.getRecord st alias) field
     r@(Reg rn) <- nextRegister
@@ -368,7 +368,7 @@ genLValue st (AST.LField alias field) =
     else return $ [ Oz_load_address r (aOffset - fOffset) ]
 genLValue st (AST.LInd alias e) = -- TODO: fix records
   do 
-    offset <- eitherMaybe ("Unknown parameter/variable `" ++ alias ++ "`")
+    offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
               $ getLocalOffset st alias
     r@(Reg rn) <- getRegister
     eCode <- genExpr st e
@@ -480,9 +480,10 @@ st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("
 pr2 = AST.Program [] [AST.Array 1 (AST.Base AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
 st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType = AST.Base AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], unStackSize = 1})]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
+
 printCode :: Either String [OzCode] -> IO ()
 printCode (Right code) = putStr . unlines $ map show code
 
-eitherMaybe :: String -> Maybe a -> ErrorGenState a
-eitherMaybe a Nothing  = liftEither $ Left a
-eitherMaybe _ (Just b) = liftEither $ Right b
+maybeErr :: String -> Maybe a -> ErrorGenState a
+maybeErr a Nothing  = liftEither $ Left a
+maybeErr _ (Just b) = liftEither $ Right b

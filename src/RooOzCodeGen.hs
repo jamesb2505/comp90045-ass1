@@ -17,11 +17,7 @@ data Gen = Gen LabelNum RegNum
   
 type SlotNum = Int
 type LabelNum = Int
-data RegNum = Reg Int
-  deriving (Eq)
-
-instance Show RegNum where
-  show (Reg i) = "r" ++ show i 
+type RegNum = Int
 
 data Label 
   = ProcLabel String
@@ -91,83 +87,83 @@ instance Show OzCode where
   show (Oz_pop_stack_frame i)    
     = "  pop_stack_frame " ++ show i
   show (Oz_store s r)            
-    = "  store " ++ intercalate ", " [ show s, show r ]
+    = "  store " ++ intercalate ", " [ show s, fmtReg r ]
   show (Oz_load r s)             
-    = "  load " ++ intercalate ", " [ show r, show s ]
+    = "  load " ++ intercalate ", " [ fmtReg r, show s ]
   show (Oz_load_address r s)     
-    = "  load_address " ++ intercalate ", " [ show r, show s ]
+    = "  load_address " ++ intercalate ", " [ fmtReg r, show s ]
   show (Oz_load_indirect rI rJ)  
-    = "  load_indirect " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  load_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_store_indirect rI rJ) 
-    = "  store_indirect " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  store_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_int_const r i)       
-    = "  int_const " ++ intercalate ", " [ show r, show i ]
+    = "  int_const " ++ intercalate ", " [ fmtReg r, show i ]
   show (Oz_real_const r d)      
-    = "  real_const " ++ intercalate ", " [ show r, show d ]
+    = "  real_const " ++ intercalate ", " [ fmtReg r, show d ]
   show (Oz_string_const r s)    
-    = "  string_const " ++ show r ++ ", \"" ++ s ++ "\"" 
+    = "  string_const " ++ fmtReg r ++ ", \"" ++ s ++ "\"" 
   show (Oz_add_int rI rJ rK)
-    = "  add_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  add_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_add_real rI rJ rK)
-    = "  add_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  add_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_add_offset rI rJ rK)
-    = "  add_offset " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  add_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_int rI rJ rK)
-    = "  sub_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  sub_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_real rI rJ rK)
-    = "  sub_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  sub_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_offset rI rJ rK)
-    = "  sub_offset " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  sub_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_mul_int rI rJ rK)
-    = "  mul_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  mul_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_mul_real rI rJ rK)
-    = "  mul_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  mul_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_div_int rI rJ rK)
-    = "  div_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  div_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_div_real rI rJ rK)
-    = "  div_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  div_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_neg_int rI rJ)
-    = "  neg_int " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  neg_int " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_neg_real rI rJ)
-    = "  neg_real " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  neg_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_cmp_eq_int rI rJ rK)
-    = "  cmp_eq_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_eq_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ne_int rI rJ rK)
-    = "  cmp_ne_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_ne_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_gt_int rI rJ rK)
-    = "  cmp_gt_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_gt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ge_int rI rJ rK)
-    = "  cmp_ge_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_ge_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_lt_int rI rJ rK)
-    = "  cmp_lt_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_lt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_le_int rI rJ rK)
-    = "  cmp_le_int " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_le_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_eq_real rI rJ rK)
-    = "  cmp_eq_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_eq_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ne_real rI rJ rK)
-    = "  cmp_ne_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_ne_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_gt_real rI rJ rK)
-    = "  cmp_gt_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_gt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ge_real rI rJ rK)
-    = "  cmp_ge_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_ge_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_lt_real rI rJ rK)
-    = "  cmp_lt_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_lt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_le_real rI rJ rK)
-    = "  cmp_le_real " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  cmp_le_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_and rI rJ rK)
-    = "  and " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  and " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_or rI rJ rK)
-    = "  or " ++ intercalate ", " (map show [ rI, rJ, rK ])
+    = "  or " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_not rI rJ)            
-    = "  not " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  not " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_int_to_real rI rJ)    
-    = "  int_to_real " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  int_to_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_move rI rJ)           
-    = "  move " ++ intercalate ", " (map show [ rI, rJ ])
+    = "  move " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_branch_on_true r l)  
-    = "  branch_on_true " ++ intercalate ", " [ show r, show l ]
+    = "  branch_on_true " ++ intercalate ", " [ fmtReg r, show l ]
   show (Oz_branch_on_false r l) 
-    = "  branch_on_false " ++ intercalate ", " [ show r, show l ]
+    = "  branch_on_false " ++ intercalate ", " [ fmtReg r, show l ]
   show (Oz_branch_uncond l)      
     = "  branch_uncond " ++ show l
   show (Oz_label l)               
@@ -181,11 +177,14 @@ instance Show OzCode where
   show (Oz_halt)                 
     = "halt"
   show (Oz_debug_reg r)         
-    = "  debug_reg " ++ show r
+    = "  debug_reg " ++ fmtReg r
   show (Oz_debug_slot s)         
     = "  debug_slot " ++ show s
   show (Oz_debug_stack)          
     = "  debug_stack"
+
+fmtReg :: RegNum -> String
+fmtReg n = "r" ++ show n
 
 nextLabel :: ErrorGenState Label
 nextLabel =
@@ -197,24 +196,24 @@ nextLabel =
 getRegister :: ErrorGenState RegNum
 getRegister = 
   do
-    Gen ln r@(Reg rn) <- lift get
-    return r
+    Gen ln rn <- lift get
+    return rn
 
 nextRegister :: ErrorGenState RegNum
 nextRegister = 
   do
-    Gen ln r@(Reg rn) <- lift get
-    lift . put . Gen ln . Reg $ rn + 1
-    return r
+    Gen ln rn <- lift get
+    lift . put . Gen ln $ rn + 1
+    return rn
 
-putRegister :: Int -> ErrorGenState ()
+putRegister :: RegNum -> ErrorGenState ()
 putRegister r =
   do
     Gen ln _ <- lift get
-    lift . put . Gen ln $ Reg r
+    lift . put $ Gen ln r
 
 initState :: Gen
-initState = Gen 0 $ Reg 0
+initState = Gen 0 0
 
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
 runCodeGen prog st = evalState (runExceptT $ genProg st prog) initState
@@ -235,14 +234,14 @@ genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
       <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
               $ lookup name ps
     let nParams = length params
-    let pCode = [ Oz_store i (Reg i) | i <- [0..nParams - 1] ]
+    let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
     stmts <- repeatGen (genStmt $ st { unProcedures = (name, proc):ps }) ss
     if stackSize > 0
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
                 : pCode
-              ++ [ Oz_int_const (Reg 0) 0 ]
-              ++ [ Oz_store (i + nParams) $ Reg 0 | i <- [0..stackSize - 1] ]
+              ++ [ Oz_int_const 0 0 ]
+              ++ [ Oz_store (i + nParams) 0 | i <- [0..stackSize - 1] ]
               ++ stmts 
               ++ [ Oz_pop_stack_frame stackSize
                 , Oz_return
@@ -260,8 +259,8 @@ genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
                  $ getLocalOffset st lAlias
       rOffset <- maybeErr ("Unknown parameter `" ++ rAlias ++ "`")
                  $ getLocalOffset st rAlias
-      return $ [ Oz_load (Reg 0) rOffset
-               , Oz_store lOffset (Reg 0)
+      return $ [ Oz_load 0 rOffset
+               , Oz_store lOffset 0
                ]
 genStmt st (AST.Assign l e) =
   do 
@@ -271,7 +270,7 @@ genStmt st (AST.Assign l e) =
     lCode <- genLValue st l
     return $ eCode 
           ++ lCode
-          ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
+          ++ [ Oz_store_indirect 1 0 ]
 genStmt st (AST.Read l) =
   do 
     putRegister 1
@@ -279,7 +278,7 @@ genStmt st (AST.Read l) =
     reader <- getReadBuiltin $ getLValT st l
     return $ Oz_call_builtin reader
            : lCode
-          ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
+          ++ [ Oz_store_indirect 1 0 ]
 genStmt st (AST.Write e) =
   do 
     putRegister 0
@@ -304,7 +303,7 @@ genStmt st (AST.If e ss) =
     ssCode <- genStmts st ss
     endLabel <- nextLabel
     return $ eCode
-          ++ [ Oz_branch_on_false (Reg 0) endLabel ]
+          ++ [ Oz_branch_on_false 0 endLabel ]
           ++ ssCode
           ++ [ Oz_label endLabel ]
 genStmt st (AST.IfElse e ts fs) =
@@ -316,7 +315,7 @@ genStmt st (AST.IfElse e ts fs) =
     falseLabel <- nextLabel
     endLabel <- nextLabel
     return $ eCode
-          ++ [ Oz_branch_on_false (Reg 0) falseLabel ]
+          ++ [ Oz_branch_on_false 0 falseLabel ]
           ++ tsCode
           ++ [ Oz_branch_uncond endLabel ]
           ++ fsCode
@@ -331,7 +330,7 @@ genStmt st (AST.While e ss) =
     endLabel <- nextLabel
     return $ Oz_label startLabel
            : eCode
-          ++ [ Oz_branch_on_false (Reg 0) endLabel ]
+          ++ [ Oz_branch_on_false 0 endLabel ]
           ++ ssCode
           ++ [ Oz_branch_uncond startLabel
              , Oz_label endLabel
@@ -358,9 +357,9 @@ genLValue st (AST.LField alias field) =
     aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
                $ getLocalOffset st alias
     let fOffset = unFOffset $ getField (ST.getRecord st alias) field
-    r@(Reg rn) <- nextRegister
+    r <- nextRegister
     if ST.isRef st alias 
-    then let r' = Reg $ rn + 1 in
+    then let r' = r + 1 in
          return $ [ Oz_load r aOffset
                   , Oz_int_const r' fOffset
                   , Oz_sub_offset r r r'
@@ -370,9 +369,9 @@ genLValue st (AST.LInd alias e) = -- TODO: fix records
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
               $ getLocalOffset st alias
-    r@(Reg rn) <- getRegister
+    r <- getRegister
     eCode <- genExpr st e
-    let r' = Reg $ rn + 1
+    let r' = r + 1
     return $ eCode
           ++ [ Oz_load_address r' offset
              , Oz_sub_offset r r' r
@@ -402,19 +401,19 @@ genExpr _ (AST.StrConst _ s) =
     return $ [ Oz_string_const r s ]
 genExpr st (AST.BinOpExpr _ op a b) =
   do 
-    r@(Reg n) <- getRegister
+    r <- getRegister
     aCode <- genExpr st a
     bCode <- genExpr st b
-    putRegister (n + 1)
+    putRegister $ r + 1
     r' <- getRegister
     return $ aCode
           ++ bCode
           ++ [ getBinOpCode op r r r' ]
 genExpr st (AST.UnOpExpr _ op a) =
   do 
-    r@(Reg n) <- getRegister
+    r <- getRegister
     aCode <- genExpr st a
-    putRegister (n + 1)
+    putRegister $ r + 1
     return $ aCode
           ++ [ getUnOpCode op r r ]
 

@@ -306,22 +306,10 @@ stmt -- ~ :: { AST.Stmt }
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
     ; $3.symtab = $$.symtab
-    ; where let params = unParams . snd . head $ unProcedures $$.symtab in
-            let rval = fromJust $ AST.getLVal $3 in
-            let rId = AST.getLId rval in
-            let lId = AST.getLId $1 in
-            let getMode v = ST.unMode . fromJust $ lookup v params in 
-            let rMode = getMode rId in 
-            let lMode = getMode lId in
-            unless ($1.etype == $3.etype 
-                    && (AST.isAssignableT $1.etype
-                        || ((AST.isArrayT $1.etype || AST.isRecordT $1.etype)
-                            && AST.isLVal $3 && AST.isLId rval 
-                            && AST.isLId $1 && ST.isTableKey rId params
-                            && lMode == rMode && lMode == AST.Ref)))
+    ; where unless (checkAssignRef $$.symtab $1 $3 $1.etype $3.etype
+                    || ($1.etype == $3.etype && AST.isAssignableT $1.etype))
                    (Left $ fmtPos (fst $2) ++ ": bad assignment types")
-    } {- checks assignments are valid, 
-         including reference mode arrays/records -}
+    } 
   | read lval ';'                    
     { $$ = AST.Read $2
     ; $2.records = $$.records 
@@ -808,5 +796,24 @@ lookupSize st@(PartialTable _ as) (AST.Alias ident)
     = s * lookupSize st t
   where (ST.Array t s) = fromJust $ lookup ident as
 lookupSize _ _ = 1
+
+checkAssignRef :: SymbolTable -> AST.LValue -> AST.Expr 
+                              -> AST.ExprType -> AST.ExprType -> Bool
+checkAssignRef st lval e lType rType
+  = lType == rType
+    && (AST.isArrayT lType || AST.isRecordT lType) 
+    && not (null procs) && ST.isTableKey rId params
+    && AST.isLVal e && AST.isLId lval
+    && (AST.isLId rval || AST.isLInd rval)
+    && lMode == rMode && lMode == AST.Ref
+  where 
+    procs = unProcedures st
+    params = unParams . snd $ head procs
+    rval = fromJust $ AST.getLVal e
+    rId = AST.getLId rval
+    lId = AST.getLId lval
+    getMode v = ST.unMode . fromJust $ lookup v params 
+    rMode = getMode rId
+    lMode = getMode lId
 
 }

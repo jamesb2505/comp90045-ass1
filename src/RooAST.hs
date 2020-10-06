@@ -185,6 +185,10 @@ isLId :: LValue -> Bool
 isLId (LId _) = True
 isLId _       = False
 
+isLInd :: LValue -> Bool
+isLInd (LInd _ _) = True
+isLInd _          = False
+
 -- getLId
 -- Gets the Ident of a given LValue
 getLId :: LValue -> Ident

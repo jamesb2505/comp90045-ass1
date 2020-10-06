@@ -64,4 +64,26 @@ tableKeys = map fst
 -- isTableKey
 -- Checks if an Idetn is a key in a Table a
 isTableKey :: AST.Ident -> Table a -> Bool
-isTableKey ident table = elem ident $ tableKeys table
+isTableKey alias table = elem alias $ tableKeys table
+
+isRef :: SymbolTable -> AST.Ident -> Bool
+isRef (SymbolTable _ _ ((_,Procedure ps _ _):_)) alias
+  | isTableKey alias ps
+  = (AST.Ref ==) . unMode . M.fromJust $ lookup alias ps
+isRef _ _ = False
+
+getRecord :: SymbolTable -> AST.Ident -> Record
+getRecord (SymbolTable rs _ _) alias = M.fromJust $ lookup alias rs
+
+getField :: Record -> AST.Ident -> Field
+getField (Record fs) field = M.fromJust $ lookup field fs
+
+getArray :: SymbolTable -> AST.Ident -> Array
+getArray (SymbolTable _ as _) alias = M.fromJust $ lookup alias as
+
+getLocalOffset :: SymbolTable -> AST.Ident -> Int
+getLocalOffset (SymbolTable _ _ ((_,Procedure ps vs _):_)) alias
+  | isTableKey alias ps
+  = unPOffset . M.fromJust $ lookup alias ps
+  | isTableKey alias vs
+  = unVOffset . M.fromJust $ lookup alias vs

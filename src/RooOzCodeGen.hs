@@ -259,6 +259,14 @@ genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
                ++ [ Oz_return ]
 
 genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
+genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
+  | ST.isRef st lAlias && ST.isRef st rAlias
+  = do 
+      let lOffset = getLocalOffset st lAlias
+      let rOffset = getLocalOffset st rAlias
+      return $ [ Oz_load (Reg 0) rOffset
+               , Oz_store lOffset (Reg 0)
+               ]
 genStmt st (AST.Assign l e) =
   do 
     putRegister 0
@@ -268,12 +276,11 @@ genStmt st (AST.Assign l e) =
     return $ eCode 
           ++ lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
-genStmt st (AST.Read l) = -- TODO
+genStmt st (AST.Read l) =
   do 
     putRegister 1
     lCode <- genLValue st l
-    return $ Oz_call_builtin (getReadBuiltin 
-                              $ getLValT (snd . head $ ST.unProcedures st) l)
+    return $ Oz_call_builtin (getReadBuiltin $ getLValT st l)
            : lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
 genStmt st (AST.Write e) =
@@ -305,9 +312,7 @@ genStmt st (AST.IfElse e ts fs) =
   do 
     putRegister 0
     eCode <- genExpr st e
-    putRegister 0
     tsCode <- repeatGen (genStmt st) ts
-    putRegister 0
     fsCode <- repeatGen (genStmt st) fs
     falseLabel <- nextLabel
     endLabel <- nextLabel
@@ -338,24 +343,58 @@ genStmt st (AST.Call _ _) = -- TODO
     return []
 
 genLValue :: ST.SymbolTable -> AST.LValue -> GenState [OzCode]
-genLValue _ _ = undefined -- TODO
-
-genExpr :: ST.SymbolTable -> AST.Expr -> GenState [OzCode]
-genExpr _ (AST.LVal _ _) = -- TODO
+genLValue st (AST.LId alias) = 
   do 
-    return []
+    let offset = getLocalOffset st alias
+    r <- nextRegister
+    if ST.isRef st alias 
+    then return $ [ Oz_load r offset ]
+    else return $ [ Oz_load_address r offset ]
+genLValue st (AST.LField alias field) = 
+  do 
+    let aOffset = getLocalOffset st alias
+    let fOffset = unFOffset $ getField (ST.getRecord st alias) field
+    r@(Reg rn) <- nextRegister
+    if ST.isRef st alias 
+    then let r' = Reg $ rn + 1 in
+         return $ [ Oz_load r aOffset
+                  , Oz_int_const r' fOffset
+                  , Oz_sub_offset r r r'
+                  ]
+    else return $ [ Oz_load_address r (aOffset - fOffset) ]
+genLValue st (AST.LInd alias e) = -- TODO: fix records
+  do 
+    let offset = getLocalOffset st alias
+    r@(Reg rn) <- getRegister
+    eCode <- genExpr st e
+    let r' = Reg $ rn + 1
+    return $ eCode
+          ++ [ Oz_load_address r' offset
+             , Oz_sub_offset r r' r
+             ]
+genLValue st (AST.LIndField alias e field) = -- TODO
+  do 
+    putRegister 0
+    eCode <- genExpr st e
+    return $ []
+    
+genExpr :: ST.SymbolTable -> AST.Expr -> GenState [OzCode]
+genExpr st (AST.LVal _ lval) = 
+  do 
+    lCode <- genLValue st lval
+    return $ lCode
 genExpr _ (AST.BoolConst _ b) =
   do 
     r <- nextRegister
-    return [ Oz_int_const r $ if b then 1 else 0 ]
+    return $ [ Oz_int_const r $ if b then 1 else 0 ]
 genExpr _ (AST.IntConst _ i) =
   do 
     r <- nextRegister
-    return [ Oz_int_const r (fromInteger i) ]
+    return $ [ Oz_int_const r $ fromInteger i ]
 genExpr _ (AST.StrConst _ s) =
   do 
     r <- nextRegister
-    return [ Oz_string_const r s ]
+    return $ [ Oz_string_const r s ]
 genExpr st (AST.BinOpExpr _ op a b) =
   do 
     r@(Reg n) <- getRegister
@@ -404,10 +443,14 @@ getUnOpCode :: AST.UnOp -> (RegNum -> RegNum -> OzCode)
 getUnOpCode Op_not = Oz_not
 getUnOpCode Op_neg = Oz_neg_int
 
-getLValT :: ST.Procedure -> AST.LValue -> AST.ExprType
-getLValT = undefined
+getLValT :: ST.SymbolTable -> AST.LValue -> AST.ExprType -- TODO
+getLValT st (LId alias) = AST.IntT
+getLValT st (LInd alias _) = AST.IntT
+getLValT st (LField alias field) = AST.IntT
+getLValT st (LIndField alias _ field) =  AST.IntT
 
-p = "procedure main () { writeln \"Hello, World!\"; }"
+p = "record { integer field } rec; procedure main () { writeln \"Hello, World!\"; } procedure r () rec r; { writeln rec.field; }"
+p2 = "array [1] integer arr; procedure main () { writeln \"Hello, World!\"; } procedure r () arr a; { writeln a[0]; }"
 ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})
 pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst IntT 0) (AST.IntConst IntT 0))]
                        , AST.Procedure "b" [] [] [ AST.Writeln (AST.BinOpExpr AST.BoolT AST.Op_and (AST.UnOpExpr AST.BoolT AST.Op_not (AST.BoolConst BoolT True)) (AST.BoolConst AST.BoolT False))
@@ -417,6 +460,8 @@ pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr 
 st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})
                                                                             , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
                                                                             ]}
+pr2 = AST.Program [] [AST.Array 1 (AST.Base AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
+st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType = AST.Base AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], unStackSize = 1})]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
 printCode :: Either String [OzCode] -> IO ()
 printCode (Right code) = putStr . unlines $ map show code

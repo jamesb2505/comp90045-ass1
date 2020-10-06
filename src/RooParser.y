@@ -382,15 +382,15 @@ stmt -- ~ :: { AST.Stmt }
 lval -- ~ :: { AST.LValue }
   : ident                        
     { $$ = AST.LId $1
-    ; $$.etype = getProcType $$.symtab $1
+    ; $$.etype = ST.getProcType $$.symtab $1
     }
   | ident '.' ident              
     { $$ = AST.LField $1 $3
-    ; $$.etype = getFieldType $$.records (getProcType $$.symtab $1) $3
-    ; where unless (AST.isRecordT $ getProcType $$.symtab $1)
+    ; $$.etype = ST.getFieldType $$.records (ST.getProcType $$.symtab $1) $3
+    ; where unless (AST.isRecordT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
                           ++ ": unknown record alias `" ++ $1 ++ "`")
-    ; where let identT = getProcType $$.symtab $1 in
+    ; where let identT = ST.getProcType $$.symtab $1 in
             let AST.RecordT alias = identT in
             unless (AST.isRecordT identT && not ($$.etype == AST.ErrorT))
                    (Left $ fmtPos (fst $2) 
@@ -398,26 +398,26 @@ lval -- ~ :: { AST.LValue }
     }
   | ident '[' expr ']'           
     { $$ = AST.LInd $1 $3 
-    ; $$.etype = getArrayType $ getProcType $$.symtab $1
+    ; $$.etype = ST.getArrayType $ ST.getProcType $$.symtab $1
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isIntT $3.etype)
                    (Left $ fmtPos (fst $2) 
                           ++ ": non-integral expression in array element index")
-    ; where unless (AST.isArrayT $ getProcType $$.symtab $1)
+    ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
                           ++ ": unknown array alias `" ++ $1 ++ "`")
     }
   | ident '[' expr ']' '.' ident 
     { $$ = AST.LIndField $1 $3 $6 
-    ; $$.etype = getFieldType $$.records (getArrayType $ getProcType $$.symtab $1) $6
+    ; $$.etype = ST.getFieldType $$.records (ST.getArrayType $ ST.getProcType $$.symtab $1) $6
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
-    ; where unless (AST.isArrayT $ getProcType $$.symtab $1)
+    ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
                           ++ ": unknown array alias `" ++ $1 ++ "`")
-    ; where unless ((not . AST.isArrayT $ getProcType $$.symtab $1)
-                    || (AST.isRecordT . getArrayType $ getProcType $$.symtab $1))
+    ; where unless ((not . AST.isArrayT $ ST.getProcType $$.symtab $1)
+                    || (AST.isRecordT . ST.getArrayType $ ST.getProcType $$.symtab $1))
                    (Left $ fmtPos (fst $2) 
                           ++ ": unknown array of records `" ++ $1 ++ "`")
     ; where unless (AST.isIntT $3.etype)
@@ -674,61 +674,6 @@ parseError :: [Lexeme] -> Either String a
 parseError []            = Left "EOF: Unxpected parse error"
 parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unxpected " ++ show t
 
--- getType 
--- gets the ExprType of a given TypeName in a SymbolTable
--- ErrorT is returned if TypeName is not found in any context
-getType :: ST.SymbolTable -> AST.TypeName -> AST.ExprType
-getType st@(ST.SymbolTable rs as _) 
-        (AST.Alias alias)
-  | ST.isTableKey alias rs
-    = AST.RecordT alias
-  | ST.isTableKey alias as
-    = case lookup alias as of
-        Nothing             -> AST.ErrorT
-        Just (ST.Array t _) -> AST.ArrayT alias $ getType st t
-  | procType /= AST.ErrorT
-    = procType
-  where procType = getProcType st alias
-getType _ (AST.Base AST.BoolType) = AST.BoolT
-getType _ (AST.Base AST.IntType) = AST.IntT
-getType _ _ = AST.ErrorT
-
-getProcType :: ST.SymbolTable -> AST.Ident -> AST.ExprType
-getProcType st@(ST.SymbolTable _ _ ((_,ST.Procedure ps vs _):_)) name
-  | ST.isTableKey name ps
-    = case lookup name ps of
-        Nothing               -> AST.ErrorT
-        Just (ST.Param t _ _) -> getType st t
-  | ST.isTableKey name vs
-    = case lookup name vs of
-        Nothing           -> AST.ErrorT
-        Just (ST.Var t _) -> getType st t
-getProcType _ _ = AST.ErrorT
-
--- getAliasType 
--- gets the ExprType of a given alias (Ident) in a SymbolTable
--- ErrorT is returned if alias (Ident) is not found in any context
-getAliasType :: ST.SymbolTable -> AST.Ident -> AST.ExprType
-getAliasType st ident = getType st (AST.Alias ident)
-
--- getFieldType 
--- gets the ExprType of a given ST.Field (Ident) of a RecordT
--- ErrorT is returned if ST.Field is not found in any context
-getFieldType :: ST.Table ST.Record -> AST.ExprType -> AST.Ident -> AST.ExprType
-getFieldType rs rt@(AST.RecordT r) f
-    = case lookup r rs >>= lookup f . ST.unFields of
-        Nothing                          -> AST.ErrorT
-        (Just (ST.Field AST.BoolType _)) -> AST.BoolT
-        (Just (ST.Field AST.IntType _))  -> AST.IntT
-getFieldType _ _ _ = AST.ErrorT 
-
--- getArrayType 
--- gets the ExprType of the values of a given ArrayT
--- ErrorT is returned if alias (Ident) is not found in any context
-getArrayType :: AST.ExprType -> AST.ExprType
-getArrayType (AST.ArrayT _ t) = t
-getArrayType _              = AST.ErrorT
-
 -- checkDuplicate
 -- Checks if a key is found in a list of keys
 -- fail with msg if duplicate is found
@@ -786,8 +731,8 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
         callParams = map snd . ST.unParams . fromJust $ lookup proc procs
         validArg :: ST.Param -> AST.Expr -> Bool
         validArg (ST.Param t m _) a = 
-          let tType = getType stNoProc t in
-            AST.getExprT a == getType stNoProc t
+          let tType = ST.getType stNoProc t in
+            AST.getExprT a == ST.getType stNoProc t
             && (AST.isLVal a ||  m == AST.Ref)
                
 

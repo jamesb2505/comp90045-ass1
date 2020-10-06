@@ -84,6 +84,58 @@ getArray (SymbolTable _ as _) alias = M.fromJust $ lookup alias as
 getLocalOffset :: SymbolTable -> AST.Ident -> Maybe Int
 getLocalOffset (SymbolTable _ _ ((_,Procedure ps vs _):_)) alias
   | isTableKey alias ps
-    = Just . unPOffset . M.fromJust $ lookup alias ps
+    = unPOffset <$> lookup alias ps
   | isTableKey alias vs
-    = Just . unVOffset . M.fromJust $ lookup alias vs
+    = unVOffset <$> lookup alias vs
+getLocalOffset _ _ = Nothing
+
+-- getType 
+-- gets the ExprType of a given TypeName in a SymbolTable
+-- ErrorT is returned if TypeName is not found in any context
+getType :: SymbolTable -> AST.TypeName -> AST.ExprType
+getType st@(SymbolTable rs as _) (AST.Alias alias)
+  | isTableKey alias rs
+    = AST.RecordT alias
+  | isTableKey alias as
+    = case lookup alias as of
+        Nothing          -> AST.ErrorT
+        Just (Array t _) -> AST.ArrayT alias $ getType st t
+getType _ (AST.Base AST.BoolType) = AST.BoolT
+getType _ (AST.Base AST.IntType) = AST.IntT
+getType _ _ = AST.ErrorT
+
+getProcType :: SymbolTable -> AST.Ident -> AST.ExprType
+getProcType st@(SymbolTable _ _ ((_,Procedure ps vs _):_)) name
+  | isTableKey name ps
+    = case lookup name ps of
+        Nothing            -> AST.ErrorT
+        Just (Param t _ _) -> getType st t
+  | isTableKey name vs
+    = case lookup name vs of
+        Nothing        -> AST.ErrorT
+        Just (Var t _) -> getType st t
+getProcType _ _ = AST.ErrorT
+
+-- getAliasType 
+-- gets the ExprType of a given alias (Ident) in a SymbolTable
+-- ErrorT is returned if alias (Ident) is not found in any context
+getAliasType :: SymbolTable -> AST.Ident -> AST.ExprType
+getAliasType st ident = getType st (AST.Alias ident)
+
+-- getFieldType 
+-- gets the ExprType of a given Field (Ident) of a RecordT
+-- ErrorT is returned if Field is not found in any context
+getFieldType :: Table Record -> AST.ExprType -> AST.Ident -> AST.ExprType
+getFieldType rs rt@(AST.RecordT r) f
+    = case lookup r rs >>= lookup f . unFields of
+        Nothing                       -> AST.ErrorT
+        (Just (Field AST.BoolType _)) -> AST.BoolT
+        (Just (Field AST.IntType _))  -> AST.IntT
+getFieldType _ _ _ = AST.ErrorT 
+
+-- getArrayType 
+-- gets the ExprType of the values of a given ArrayT
+-- ErrorT is returned if alias (Ident) is not found in any context
+getArrayType :: AST.ExprType -> AST.ExprType
+getArrayType (AST.ArrayT _ t) = t
+getArrayType _              = AST.ErrorT

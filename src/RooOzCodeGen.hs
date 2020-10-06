@@ -207,14 +207,6 @@ nextRegister =
     put . Gen ln . Reg $ rn + 1
     return r
 
-prevRegister :: GenState RegNum
-prevRegister = 
-  do
-    Gen ln (Reg rn) <- get
-    let r = Reg $ rn - 1 
-    put $ Gen ln r
-    return r
-
 putRegister :: Int -> GenState ()
 putRegister r =
   do
@@ -225,7 +217,7 @@ initState :: Gen
 initState = Gen 0 $ Reg 0
 
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen prog st = evalState (runExceptT (genProg st prog)) initState
+runCodeGen prog st = evalState (runExceptT $ genProg st prog) initState
       
 repeatGen :: (a -> ErrorGenState [OzCode]) -> [a] -> ErrorGenState [OzCode]
 repeatGen gen = liftM concat . mapM gen
@@ -284,21 +276,24 @@ genStmt st (AST.Read l) =
   do 
     lift $ putRegister 1
     lCode <- genLValue st l
-    return $ Oz_call_builtin (getReadBuiltin $ getLValT st l)
+    reader <- getReadBuiltin $ getLValT st l
+    return $ Oz_call_builtin reader
            : lCode
           ++ [ Oz_store_indirect (Reg 1) (Reg 0) ]
 genStmt st (AST.Write e) =
   do 
     lift $ putRegister 0
     expr <- genExpr st e
+    printer <- getPrintBuiltin $ AST.getExprT e
     return $ expr 
-          ++ [ Oz_call_builtin . getPrintBuiltin $ AST.getExprT e ]
+          ++ [ Oz_call_builtin printer ]
 genStmt st (AST.Writeln e) =
   do 
     lift $ putRegister 0
     expr <- genExpr st e
+    printer <- getPrintBuiltin $ AST.getExprT e
     return $ expr
-          ++ [ Oz_call_builtin . getPrintBuiltin $ AST.getExprT e 
+          ++ [ Oz_call_builtin printer 
              , Oz_call_builtin "print_newline"
              ]
 genStmt st (AST.If e ss) =
@@ -423,17 +418,17 @@ genExpr st (AST.UnOpExpr _ op a) =
     return $ aCode
           ++ [ getUnOpCode op r r ]
 
-getBuiltinSuffix :: AST.ExprType -> String
-getBuiltinSuffix AST.BoolT = "bool"
-getBuiltinSuffix AST.IntT  = "int"
-getBuiltinSuffix AST.StrT  = "string"
-getBuiltinSuffix t         = error $ "no such builtin for " ++ show t
+getBuiltinSuffix :: AST.ExprType -> Either String String
+getBuiltinSuffix AST.BoolT = Right "bool"
+getBuiltinSuffix AST.IntT  = Right "int"
+getBuiltinSuffix AST.StrT  = Right "string"
+getBuiltinSuffix t         = Left $ "no builtin for " ++ show t
 
-getPrintBuiltin :: AST.ExprType -> String
-getPrintBuiltin t = "print_" ++ getBuiltinSuffix t
+getPrintBuiltin :: AST.ExprType -> ErrorGenState String
+getPrintBuiltin t = liftEither $ ("print_" ++) <$> getBuiltinSuffix t
 
-getReadBuiltin :: AST.ExprType -> String
-getReadBuiltin t = "read_" ++ getBuiltinSuffix t
+getReadBuiltin :: AST.ExprType -> ErrorGenState String
+getReadBuiltin t = liftEither $ ("read_" ++) <$> getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
 getBinOpCode Op_or  = Oz_or
@@ -454,10 +449,22 @@ getUnOpCode Op_not = Oz_not
 getUnOpCode Op_neg = Oz_neg_int
 
 getLValT :: ST.SymbolTable -> AST.LValue -> AST.ExprType -- TODO
-getLValT st (LId alias) = AST.IntT
-getLValT st (LInd alias _) = AST.IntT
-getLValT st (LField alias field) = AST.IntT
-getLValT st (LIndField alias _ field) =  AST.IntT
+getLValT st (LId alias) = ST.getProcType st alias
+getLValT st@(ST.SymbolTable _ as _) (LInd alias _)
+  | AST.isArrayT aliasType
+    = ST.getArrayType aliasType
+  where aliasType = ST.getProcType st alias
+getLValT st@(ST.SymbolTable rs _ _) (LField alias field)
+  | AST.isRecordT aliasType
+    = ST.getFieldType rs aliasType field
+  where aliasType = ST.getProcType st alias
+getLValT st@(ST.SymbolTable rs _ _) (LIndField alias _ field) 
+  | AST.isRecordT aliasType && AST.isRecordT recordType
+    = ST.getFieldType rs recordType field
+  where 
+    aliasType = ST.getProcType st alias
+    recordType = ST.getArrayType aliasType
+getLValT _ _ = AST.ErrorT
 
 p = "record { integer field } rec; procedure main () { writeln \"Hello, World!\"; } procedure r () rec r; { writeln rec.field; }"
 p2 = "array [1] integer arr; procedure main () { writeln \"Hello, World!\"; } procedure r () arr a; { writeln a[0]; }"
@@ -476,6 +483,6 @@ s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrCo
 printCode :: Either String [OzCode] -> IO ()
 printCode (Right code) = putStr . unlines $ map show code
 
-eitherMaybe :: MonadError e m => e -> Maybe a -> m a
+eitherMaybe :: String -> Maybe a -> ErrorGenState a
 eitherMaybe a Nothing  = liftEither $ Left a
 eitherMaybe _ (Just b) = liftEither $ Right b

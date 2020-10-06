@@ -389,10 +389,12 @@ lval -- ~ :: { AST.LValue }
     ; $$.etype = getFieldType $$.records (getProcType $$.symtab $1) $3
     ; where unless (AST.isRecordT $ getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unkown record alias `" ++ $1 ++ "`")
-    ; where unless (not $ $$.etype == AST.ErrorT)
+                          ++ ": unknown record alias `" ++ $1 ++ "`")
+    ; where let identT = getProcType $$.symtab $1 in
+            let AST.RecordT alias = identT in
+            unless (AST.isRecordT identT && not ($$.etype == AST.ErrorT))
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unkown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
+                          ++ ": unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
     }
   | ident '[' expr ']'           
     { $$ = AST.LInd $1 $3 
@@ -404,7 +406,7 @@ lval -- ~ :: { AST.LValue }
                           ++ ": non-integral expression in array element index")
     ; where unless (AST.isArrayT $ getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unkown array alias `" ++ $1 ++ "`")
+                          ++ ": unknown array alias `" ++ $1 ++ "`")
     }
   | ident '[' expr ']' '.' ident 
     { $$ = AST.LIndField $1 $3 $6 
@@ -413,11 +415,11 @@ lval -- ~ :: { AST.LValue }
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isArrayT $ getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unkown array alias `" ++ $1 ++ "`")
+                          ++ ": unknown array alias `" ++ $1 ++ "`")
     ; where unless ((not . AST.isArrayT $ getProcType $$.symtab $1)
                     || (AST.isRecordT . getArrayType $ getProcType $$.symtab $1))
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unkown array of records `" ++ $1 ++ "`")
+                          ++ ": unknown array of records `" ++ $1 ++ "`")
     ; where unless (AST.isIntT $3.etype)
                    (Left $ fmtPos (fst $2) 
                           ++ ": non-integral expression in array element index")

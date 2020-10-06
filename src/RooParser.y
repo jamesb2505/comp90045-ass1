@@ -148,7 +148,7 @@ field -- ~ :: { AST.Field }
   : basetype ident { $$ = AST.Field $1 $2 }
 
 -- parses a basetype (integer or boolean)
-basetype -- ~ :: { AST.BaseType }
+basetype -- ~ :: { AST.AtomicType }
   : boolean { $$ = AST.BoolType }
   | integer { $$ = AST.IntType }
 
@@ -186,7 +186,7 @@ arr -- ~ :: { AST.Array }
 
 -- parses a typename (alias or atomic type)
 typename -- ~ :: { AST.TypeName }
-  : basetype { $$ = AST.Base $1 }
+  : basetype { $$ = AST.Atomic $1 }
   | ident    { $$ = AST.Alias $1 }
 
 -- parses a non-empty sequence of procedure definitions
@@ -246,7 +246,7 @@ params_ -- ~ :: { [AST.Param] }
 -- parses a parameter definition
 param -- ~ :: { AST.Param }
   : ident ident         { $$ = AST.ParamAlias $1 $2 }
-  | basetype mode ident { $$ = AST.ParamBase $1 $2 $3 }
+  | basetype mode ident { $$ = AST.ParamAtomic $1 $2 $3 }
 
 -- parses a mode (ref or val)
 mode -- ~ :: { AST.Mode }
@@ -732,7 +732,7 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
         validArg :: ST.Param -> AST.Expr -> Bool
         validArg (ST.Param t m _) a = 
           let tType = ST.getType stNoProc t in
-            AST.getExprT a == ST.getType stNoProc t
+            AST.getExprType a == ST.getType stNoProc t
             && (AST.isLVal a ||  m == AST.Ref)
                
 
@@ -783,8 +783,8 @@ entryParams params = zipWith entryParam params [0..]
 entryParam :: AST.Param -> Int -> Entry ST.Param
 entryParam (AST.ParamAlias t ident) offset = 
   (ident, ST.Param (AST.Alias t) AST.Ref offset)
-entryParam (AST.ParamBase t m ident) offset = 
-  (ident, ST.Param (AST.Base t) m offset)
+entryParam (AST.ParamAtomic t m ident) offset = 
+  (ident, ST.Param (AST.Atomic t) m offset)
 
 -- entryVars
 -- Converts a [AST.Var] into a [Entry ST.Var]

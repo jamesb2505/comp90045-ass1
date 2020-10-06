@@ -6,51 +6,72 @@ module RooAST where
 
 type Ident = String
 
--- root of AST
+-- Program
+-- Root of AST
 data Program
   = Program [Record] [Array] [Procedure]
   deriving (Show, Eq)
 
+-- Record
+-- Represents a record definition
 data Record
   = Record [Field] Ident
   deriving (Show, Eq)
   
+-- Field
+-- Represents a field of a record definition
 data Field
-  = Field BaseType Ident
+  = Field AtomicType Ident
   deriving (Show, Eq)
 
+-- Array
+-- Represents an array definition
 data Array
   = Array Integer TypeName Ident
   deriving (Show, Eq)
 
+-- Prodecure
+-- Represents a procedure definition
 data Procedure
   = Procedure Ident [Param] [Var] [Stmt]
   deriving (Show, Eq)
 
+-- Param
+-- Represents a parameter of a procedure definition
 data Param
   = ParamAlias Ident Ident
-  | ParamBase BaseType Mode Ident
+  | ParamAtomic AtomicType Mode Ident
   deriving (Show, Eq)
   
+-- Mode
+-- Represents a the mode of a parameter definition
 data Mode 
   = Val 
   | Ref
   deriving (Show, Eq)
 
-data BaseType
+-- AtomicType
+-- Represents a record definition
+data AtomicType
   = IntType 
   | BoolType
   deriving (Show, Eq)
   
+-- TypeName
+-- Represents a type name/alias
 data TypeName
-  = Base BaseType
+  = Atomic AtomicType
   | Alias Ident
   deriving (Show, Eq)
   
+-- Var
+-- Represents a list of variable declarations
 data Var
   = Var TypeName [Ident]
   deriving (Show, Eq)
 
+-- Stmt
+-- Represents a statement
 data Stmt
   = Assign LValue Expr
   | Read LValue
@@ -62,6 +83,8 @@ data Stmt
   | Call Ident [Expr]
   deriving (Show, Eq)
 
+-- LValue
+-- Represents an lvalue
 data LValue
   = LId Ident
   | LField Ident Ident
@@ -69,6 +92,8 @@ data LValue
   | LIndField Ident Expr Ident
   deriving (Show, Eq)   
 
+-- Expr
+-- Represents an expression
 data Expr
   = LVal ExprType LValue
   | BoolConst ExprType Bool
@@ -78,6 +103,8 @@ data Expr
   | UnOpExpr ExprType UnOp Expr
   deriving (Show, Eq)
 
+-- ExprType
+-- Represents the type of an expresion
 data ExprType
   = BoolT
   | IntT
@@ -87,6 +114,8 @@ data ExprType
   | ErrorT
   deriving (Eq, Show)
 
+-- BinOp
+-- Represents a binary operaton
 data BinOp
   = Op_or
   | Op_and
@@ -102,11 +131,15 @@ data BinOp
   | Op_div
   deriving (Show, Eq)
 
+-- UnOp
+-- Represents a unary operaton
 data UnOp
   = Op_not
   | Op_neg
   deriving (Show, Eq) 
 
+-- Precedence op
+-- Type class used to get the operator precedence
 class Precedence op where
   prec :: op -> Int
 
@@ -126,8 +159,10 @@ instance Precedence UnOp where
 instance Precedence Expr where
   prec (BinOpExpr _ op _ _) = prec op
   prec (UnOpExpr _ op _)    = prec op
-  prec _                  = 7
+  prec _                    = 7
 
+-- isLAssoc, isRAssoc
+-- Gets the left or right associativity of a BinOp
 isLAssoc, isRAssoc :: BinOp -> Bool
 isLAssoc _      = True
 isRAssoc Op_eq  = True
@@ -138,60 +173,84 @@ isRAssoc Op_gt  = True
 isRAssoc Op_geq = True
 isRAssoc _      = False
 
+-- isLVal
+-- True if Expr is an LVal, else False
 isLVal :: Expr -> Bool
 isLVal (LVal _ _) = True
 isLVal _          = False
 
+-- isLId
+-- True if LValue is an LId, else False
 isLId :: LValue -> Bool
 isLId (LId _) = True
 isLId _       = False
 
+-- getLId
+-- Gets the Ident of a given LValue
 getLId :: LValue -> Ident
 getLId (LId i)           = i
 getLId (LField i _)      = i
 getLId (LInd i _)        = i
 getLId (LIndField i _ _) = i
 
+-- getLVal
+-- Gets the LVal of a given Expr, else Nothing
 getLVal :: Expr -> Maybe LValue
 getLVal (LVal _ l) = Just l
 getLVal _          = Nothing 
 
-getExprT :: Expr -> ExprType
-getExprT (LVal t _)          = t
-getExprT (BoolConst t _)     = t
-getExprT (IntConst t _)      = t
-getExprT (StrConst t _)      = t
-getExprT (BinOpExpr t _ _ _) = t
-getExprT (UnOpExpr t _ _)    = t
+-- getExprType
+-- Gets the ExprType of a given Expr
+getExprType :: Expr -> ExprType
+getExprType (LVal t _)          = t
+getExprType (BoolConst t _)     = t
+getExprType (IntConst t _)      = t
+getExprType (StrConst t _)      = t
+getExprType (BinOpExpr t _ _ _) = t
+getExprType (UnOpExpr t _ _)    = t
 
+-- isAssignableT
+-- True if a ExprType can be assigned if in Val mode
 isAssignableT :: ExprType -> Bool
 isAssignableT BoolT = True
 isAssignableT IntT  = True
 isAssignableT _     = False
 
+-- isWriteableT
+-- True if a ExprType can be written, else False
 isWriteableT :: ExprType -> Bool
 isWriteableT BoolT = True
 isWriteableT IntT  = True
 isWriteableT StrT  = True
 isWriteableT _     = False
 
+-- isComparableT
+-- True if a ExprType can be compared, else False
 isComparableT :: ExprType -> Bool
 isComparableT BoolT = True
 isComparableT IntT  = True
 isComparableT _     = False
 
+-- isBoolT
+-- True if a ExprType is a BoolT, else False
 isBoolT :: ExprType -> Bool
 isBoolT BoolT = True
 isBoolT _     = False
 
+-- isIntT
+-- True if a ExprType is a IntT, else False
 isIntT :: ExprType -> Bool
 isIntT IntT = True
 isIntT _    = False
 
+-- isRecordT
+-- True if a ExprType is a RecordT, else False
 isRecordT :: ExprType -> Bool
 isRecordT (RecordT _) = True
 isRecordT _           = False
 
+-- isArrayT
+-- True if a ExprType is a ArrayT, else False
 isArrayT :: ExprType -> Bool
 isArrayT (ArrayT _ _) = True
-isArrayT _          = False
+isArrayT _            = False

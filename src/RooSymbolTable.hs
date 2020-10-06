@@ -38,7 +38,7 @@ data Procedure
   deriving (Show, Eq)
 
 data Field 
-  = Field { unFType   :: AST.BaseType
+  = Field { unFType   :: AST.AtomicType
           , unFOffset :: Int
           }
   deriving (Show, Eq)
@@ -100,8 +100,8 @@ getType st@(SymbolTable rs as _) (AST.Alias alias)
     = case lookup alias as of
         Nothing          -> AST.ErrorT
         Just (Array t _) -> AST.ArrayT alias $ getType st t
-getType _ (AST.Base AST.BoolType) = AST.BoolT
-getType _ (AST.Base AST.IntType) = AST.IntT
+getType _ (AST.Atomic AST.BoolType) = AST.BoolT
+getType _ (AST.Atomic AST.IntType) = AST.IntT
 getType _ _ = AST.ErrorT
 
 getProcType :: SymbolTable -> AST.Ident -> AST.ExprType

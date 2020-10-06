@@ -4,7 +4,7 @@ module RooLexer
   , Token(..)
   , AlexPosn(..)
   , Lexeme
-) where
+  ) where
 }
 
 %wrapper "posn"
@@ -167,10 +167,12 @@ instance Show Token where
 
 type Lexeme = (AlexPosn, Token)
 
--- String -> Token, Token Builder
+-- tok
+-- String -> Token, Lexeme builder
 tok :: (String -> Token) -> AlexPosn -> String -> Lexeme
 tok f p s = (p, f s)
 
+-- cTok
 -- Constant Token Builder
 cTok :: Token -> AlexPosn -> String -> Lexeme
 cTok t p _ = (p, t)

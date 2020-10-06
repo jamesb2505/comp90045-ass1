@@ -7,27 +7,38 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe
-
-type GenState = State Gen
-
-type ErrorGenState = ExceptT String GenState
-
-data Gen = Gen LabelNum RegNum
-  deriving (Show, Eq)
   
-type SlotNum = Int
+-- LabelNum, RegNum, SlotNum
+-- Type aliases for Ints, specifying the use of an Int argument
 type LabelNum = Int
 type RegNum = Int
+type SlotNum = Int
 
+-- Gen
+-- Data type for a generator
+data Gen = Gen LabelNum RegNum
+  deriving (Show, Eq)
+
+-- ExceptStateGen
+-- ExceptT wrapped (Stage Gen)
+-- Used to propogate errors through a successive generators
+type ExceptStateGen = ExceptT String (State Gen)
+
+-- Label
+-- Data type for two types of labels, with custom Show instance
+--  * ProcLabel, label of a procedure
+--  * BranchLabel, label of a branch
 data Label 
   = ProcLabel String
   | BranchLabel LabelNum
   deriving (Eq)
 
-instance (Show Label) where
+instance Show Label where
   show (ProcLabel l) = "proc_" ++ l
   show (BranchLabel l) = "label_" ++ show l
 
+-- OzCode
+-- Data type for Oz code, with custom Show instance
 data OzCode
   = Oz_push_stack_frame Int
   | Oz_pop_stack_frame Int
@@ -183,52 +194,88 @@ instance Show OzCode where
   show (Oz_debug_stack)          
     = "  debug_stack"
 
+-- fmtReg
+-- Formates a RegNum
 fmtReg :: RegNum -> String
 fmtReg n = "r" ++ show n
 
-nextLabel :: ErrorGenState Label
+-- printOzCodes
+-- Prints a given [OzCode] with appropiate formatting
+printOzCodes :: [OzCode] -> IO ()
+printOzCodes code = putStr . unlines $ map show code
+
+-- nextLabel
+-- Returns the next Label for a generator, post-incrementing the counter
+nextLabel :: ExceptStateGen Label
 nextLabel =
   do
     Gen ln rn <- lift get
     lift . put $ Gen (ln + 1) rn
     return $ BranchLabel ln
 
-getRegister :: ErrorGenState RegNum
+-- getRegister
+-- Returns the current RegNum for a generator
+getRegister :: ExceptStateGen RegNum
 getRegister = 
   do
-    Gen ln rn <- lift get
+    Gen _ rn <- lift get
     return rn
 
-nextRegister :: ErrorGenState RegNum
+-- nextRegister
+-- Returns the next RegNum for a generator, post-incrementing the counter
+nextRegister :: ExceptStateGen RegNum
 nextRegister = 
   do
     Gen ln rn <- lift get
     lift . put . Gen ln $ rn + 1
     return rn
 
-putRegister :: RegNum -> ErrorGenState ()
+-- putRegister 
+-- Sets the RegNum inside the State
+putRegister :: RegNum -> ExceptStateGen ()
 putRegister r =
   do
     Gen ln _ <- lift get
     lift . put $ Gen ln r
 
-initState :: Gen
-initState = Gen 0 0
+-- maybeErr
+-- Lifts a Maybe a into a ExceptStateGen, using the input String for the 
+-- Left value on Nothing
+maybeErr :: String -> Maybe a -> ExceptStateGen a
+maybeErr a Nothing  = liftEither $ Left a
+maybeErr _ (Just b) = liftEither $ Right b
 
+-- initGenState
+-- Initial State for a generator
+initGenState :: Gen
+initGenState = Gen 0 0
+
+-- runCodeGen
+-- Generates a list of OzCode of a given AST.Program
+-- Right on success, Left on error
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen prog st = evalState (runExceptT $ genProg st prog) initState
-      
-repeatGen :: (a -> ErrorGenState [OzCode]) -> [a] -> ErrorGenState [OzCode]
+runCodeGen prog st = evalState (runExceptT $ genProgram st prog) initGenState
+
+-- repeatGen
+-- Repeats a generator over a list, concatenating the results
+repeatGen :: (a -> ExceptStateGen [OzCode]) -> [a] -> ExceptStateGen [OzCode]
 repeatGen gen = liftM concat . mapM gen
     
-genProg :: ST.SymbolTable -> AST.Program -> ErrorGenState [OzCode]
-genProg st (AST.Program _ _ ps) =
+-- genProgram
+-- Generates a [OzCode] for a given AST.Program
+genProgram :: ST.SymbolTable -> AST.Program -> ExceptStateGen [OzCode]
+genProgram st (AST.Program _ _ ps) =
   do 
-    procs <- repeatGen (genProc st) ps
-    return $ [ Oz_call (ProcLabel "main"), Oz_halt ] ++ procs
+    procs <- repeatGen (genProcedure st) ps
+    return $ [ Oz_call $ ProcLabel "main" 
+             , Oz_halt 
+             ]
+          ++ procs
 
-genProc :: ST.SymbolTable -> AST.Procedure -> ErrorGenState [OzCode]
-genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
+-- genProcedure
+-- Generates a [OzCode] for a given AST.Program
+genProcedure :: ST.SymbolTable -> AST.Procedure -> ExceptStateGen [OzCode]
+genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
     proc@(ST.Procedure params vars stackSize) 
       <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
@@ -244,14 +291,18 @@ genProc st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
               ++ [ Oz_store (i + nParams) 0 | i <- [0..stackSize - 1] ]
               ++ stmts 
               ++ [ Oz_pop_stack_frame stackSize
-                , Oz_return
-                ]
+                 , Oz_return
+                 ]
     else return $ Oz_label (ProcLabel name) 
                 : pCode
               ++ stmts 
               ++ [ Oz_return ]
 
-genStmt :: ST.SymbolTable -> AST.Stmt -> ErrorGenState [OzCode]
+-- genStmt
+-- Generates a [OzCode] for a given AST.Stmt
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
+genStmt :: ST.SymbolTable -> AST.Stmt -> ExceptStateGen [OzCode]
 genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
@@ -283,14 +334,14 @@ genStmt st (AST.Write e) =
   do 
     putRegister 0
     expr <- genExpr st e
-    printer <- getPrintBuiltin $ AST.getExprT e
+    printer <- getPrintBuiltin $ AST.getExprType e
     return $ expr 
           ++ [ Oz_call_builtin printer ]
 genStmt st (AST.Writeln e) =
   do 
     putRegister 0
     expr <- genExpr st e
-    printer <- getPrintBuiltin $ AST.getExprT e
+    printer <- getPrintBuiltin $ AST.getExprType e
     return $ expr
           ++ [ Oz_call_builtin printer 
              , Oz_call_builtin "print_newline"
@@ -340,10 +391,16 @@ genStmt st (AST.Call _ _) = -- TODO
     putRegister 0
     return []
 
-genStmts :: ST.SymbolTable -> [AST.Stmt] -> ErrorGenState [OzCode]
+-- genStmts
+-- Generates a [OzCode] for a given [AST.Program]
+genStmts :: ST.SymbolTable -> [AST.Stmt] -> ExceptStateGen [OzCode]
 genStmts st ss = repeatGen (genStmt st) ss
 
-genLValue :: ST.SymbolTable -> AST.LValue -> ErrorGenState [OzCode]
+-- genLValue
+-- Generates a [OzCode] for a given AST.LValue
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
+genLValue :: ST.SymbolTable -> AST.LValue -> ExceptStateGen [OzCode]
 genLValue st (AST.LId alias) = 
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
@@ -382,7 +439,11 @@ genLValue st (AST.LIndField alias e field) = -- TODO
     eCode <- genExpr st e
     return $ []
     
-genExpr :: ST.SymbolTable -> AST.Expr -> ErrorGenState [OzCode]
+-- genExpr
+-- Generates a [OzCode] for a given AST.Expr
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
+genExpr :: ST.SymbolTable -> AST.Expr -> ExceptStateGen [OzCode]
 genExpr st (AST.LVal _ lval) = 
   do 
     lCode <- genLValue st lval
@@ -423,10 +484,10 @@ getBuiltinSuffix AST.IntT  = Right "int"
 getBuiltinSuffix AST.StrT  = Right "string"
 getBuiltinSuffix t         = Left $ "no builtin for " ++ show t
 
-getPrintBuiltin :: AST.ExprType -> ErrorGenState String
+getPrintBuiltin :: AST.ExprType -> ExceptStateGen String
 getPrintBuiltin t = liftEither $ ("print_" ++) <$> getBuiltinSuffix t
 
-getReadBuiltin :: AST.ExprType -> ErrorGenState String
+getReadBuiltin :: AST.ExprType -> ExceptStateGen String
 getReadBuiltin t = liftEither $ ("read_" ++) <$> getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
@@ -458,7 +519,7 @@ getLValT st@(ST.SymbolTable rs _ _) (LField alias field)
     = ST.getFieldType rs aliasType field
   where aliasType = ST.getProcType st alias
 getLValT st@(ST.SymbolTable rs _ _) (LIndField alias _ field) 
-  | AST.isRecordT aliasType && AST.isRecordT recordType
+  | AST.isArrayT aliasType && AST.isRecordT recordType
     = ST.getFieldType rs recordType field
   where 
     aliasType = ST.getProcType st alias
@@ -476,13 +537,7 @@ pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr 
 st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})
                                                                             , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
                                                                             ]}
-pr2 = AST.Program [] [AST.Array 1 (AST.Base AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
-st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType = AST.Base AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], unStackSize = 1})]}
+pr2 = AST.Program [] [AST.Array 1 (AST.Atomic AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
+st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType = AST.Atomic AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], unStackSize = 1})]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
 
-printCode :: Either String [OzCode] -> IO ()
-printCode (Right code) = putStr . unlines $ map show code
-
-maybeErr :: String -> Maybe a -> ErrorGenState a
-maybeErr a Nothing  = liftEither $ Left a
-maybeErr _ (Just b) = liftEither $ Right b

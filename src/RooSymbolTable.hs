@@ -139,3 +139,15 @@ getFieldType _ _ _ = AST.ErrorT
 getArrayType :: AST.ExprType -> AST.ExprType
 getArrayType (AST.ArrayT _ t) = t
 getArrayType _              = AST.ErrorT
+
+-- lookupSize
+-- looks up the size of a given AST.TypeName in a SymbolTable
+lookupSize :: SymbolTable -> AST.TypeName -> Int
+lookupSize st@(SymbolTable rs _ _) (AST.Alias alias)
+  | isTableKey alias rs
+    = length . unFields $ getRecord st alias
+lookupSize st@(SymbolTable _ as _) (AST.Alias alias)
+  | isTableKey alias as
+    = s * lookupSize st t
+  where (Array t s) = getArray st alias
+lookupSize _ _ = 1

@@ -101,7 +101,8 @@ program -- ~ :: { (AST.Program, ST.SymbolTable) }
     ; where unless (ST.isTableKey "main" $$.procs)
                    (Left "mising definition of `main` procedure")
     ; where unless ((not $ ST.isTableKey "main" $$.procs)
-                    || (null . ST.unParams . fromJust $ lookup "main" $$.procs))
+                    || (null . ST.unParams . fromJust 
+                        $ lookup "main" $$.procs))
                    (Left "`main` procedure defintion contains parameters")
     }
 
@@ -202,7 +203,7 @@ procedures -- ~ :: { [AST.Procedure] }
 procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
     { $$ = [$1]
-    ; $$.procs = [ entryProcedure (PartialTable $$.records $$.arrays) $1 ]
+    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
     ; $1.records = $$.records
     ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
     ; $1.symtab = $$.symtab
@@ -223,14 +224,15 @@ procedures_ -- ~ :: { [AST.Procedure] }
 proc -- ~ :: { AST.Procedure }
   : procedure ident '(' params ')' vars '{' stmts '}' 
     { $$ = AST.Procedure $2 $4 $6 $8 
-    ; $$.procs = [ entryProcedure (PartialTable $$.records $$.arrays) $$ ]
+    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
     ; $8.symtab = $$.symtab
     ; where let proc = snd $ head $$.procs in
-            checkDuplicates (map fst (ST.unParams proc) ++ map fst (ST.unVars proc))
-                            ("duplicate variable/parmeter in procedure definiton: `" 
-                             ++ (fst $ head $$.procs) ++ "`")
+            checkDuplicates (map fst (ST.unParams proc) 
+                             ++ map fst (ST.unVars proc))
+                            ("duplicate variable/parmeter in procedure "
+                             ++ "definiton: `" ++ (fst $ head $$.procs) ++ "`")
     }
 
 -- parses a sequence of parameter declarations
@@ -340,7 +342,8 @@ stmt -- ~ :: { AST.Stmt }
     ; $4.symtab = $$.symtab
     ; $6.symtab = $$.symtab
     ; where unless (AST.isBoolT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad if-then-else condition type")
+                   (Left $ fmtPos (fst $1) ++ ": bad if-then-else "
+                        ++ "condition type")
     }
   | if expr then stmts fi            
     { $$ = AST.If $2 $4 
@@ -377,12 +380,12 @@ lval -- ~ :: { AST.LValue }
     ; $$.etype = ST.getFieldType $$.records (ST.getProcType $$.symtab $1) $3
     ; where unless (AST.isRecordT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unknown record alias `" ++ $1 ++ "`")
+                        ++ ": unknown record alias `" ++ $1 ++ "`")
     ; where let identT = ST.getProcType $$.symtab $1 in
             let AST.RecordT alias = identT in
             unless (AST.isRecordT identT && not ($$.etype == AST.ErrorT))
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
+                        ++ ": unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
     }
   | ident '[' expr ']'           
     { $$ = AST.LInd $1 $3 
@@ -391,26 +394,27 @@ lval -- ~ :: { AST.LValue }
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isIntT $3.etype)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": non-integral expression in array element index")
+                        ++ ": non-integral expression in array element index")
     ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unknown array alias `" ++ $1 ++ "`")
+                        ++ ": unknown array alias `" ++ $1 ++ "`")
     }
   | ident '[' expr ']' '.' ident 
     { $$ = AST.LIndField $1 $3 $6 
-    ; $$.etype = ST.getFieldType $$.records (ST.getArrayType $ ST.getProcType $$.symtab $1) $6
+    ; $$.etype = ST.getFieldType $$.records (ST.getArrayType 
+                                             $ ST.getProcType $$.symtab $1) $6
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unknown array alias `" ++ $1 ++ "`")
+                        ++ ": unknown array alias `" ++ $1 ++ "`")
     ; where unless ((not . AST.isArrayT $ ST.getProcType $$.symtab $1)
                     || (AST.isRecordT . ST.getArrayType $ ST.getProcType $$.symtab $1))
                    (Left $ fmtPos (fst $2) 
-                          ++ ": unknown array of records `" ++ $1 ++ "`")
+                        ++ ": unknown array of records `" ++ $1 ++ "`")
     ; where unless (AST.isIntT $3.etype)
                    (Left $ fmtPos (fst $2) 
-                          ++ ": non-integral expression in array element index")
+                        ++ ": non-integral expression in array element index")
     }
 
 -- parses a sequence of expressions
@@ -651,10 +655,6 @@ expr -- ~ :: { AST.Expr }
     }
 
 {
-  
-data PartialTable 
-  = PartialTable (ST.Table ST.Record) (ST.Table ST.Array)
-  deriving (Show, Eq)
 
 fmtPos :: L.AlexPosn -> String
 fmtPos (L.AlexPn _ l c) = show l ++ ":" ++ show c 
@@ -680,8 +680,8 @@ parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unxpected " ++ show t
 -- fail with msg if duplicate is found
 checkDuplicate :: String -> [String] -> String -> Either String ()
 checkDuplicate key keys msg =
- unless (not $ elem key keys)
-        (Left $ msg ++ " `" ++ key ++ "`")
+  unless (not $ elem key keys)
+         (Left $ msg ++ " `" ++ key ++ "`")
 
 -- checkDuplicates
 -- Checks if keys contains no duplicates
@@ -708,7 +708,7 @@ checkProcCalls :: ST.SymbolTable -> AST.Procedure -> Either String ()
 checkProcCalls st (AST.Procedure ident _ _ ss) =
   do
     case lookup ident procs of
-      Nothing                             -> Left "unknown procedure"
+      Nothing                        -> Left "unknown procedure"
       Just (ST.Procedure params _ _) -> checkAll ss
   where
     procs :: ST.Table ST.Procedure
@@ -758,9 +758,10 @@ entryArray :: AST.Array -> ST.Entry ST.Array
 entryArray (AST.Array size t ident) = (ident, ST.Array t (fromInteger size))
 
 -- entryProcedure
--- Converts an AST.Procedure into an ST.Entry ST.Procedure with a PartialTable
-entryProcedure :: PartialTable -> AST.Procedure -> ST.Entry ST.Procedure
-entryProcedure pt (AST.Procedure ident params vars _) =
+-- Converts an AST.Procedure into an ST.Entry ST.Procedure with 
+-- a ST.SymbolTable
+entryProcedure :: ST.SymbolTable -> AST.Procedure -> ST.Entry ST.Procedure
+entryProcedure st (AST.Procedure ident params vars _) =
   (ident, ST.Procedure (entryParams params) fixedOffsetVars stackSize)
   where 
     vars' :: [ST.Entry ST.Var]
@@ -770,7 +771,7 @@ entryProcedure pt (AST.Procedure ident params vars _) =
       where fixOffset (ident, v) off = (ident, v { ST.unVOffset = off })
     offsets :: [Int]
     offsets = scanl (+) (length params)
-              $ map (lookupSize pt . ST.unVType . snd) vars'
+              $ map (ST.lookupSize st . ST.unVType . snd) vars'
     stackSize :: Int
     stackSize = last offsets
 
@@ -797,18 +798,6 @@ entryVars vars = concatMap entryVar vars
 -- ST.unVOffset is erroneous in output
 entryVar :: AST.Var -> [ST.Entry ST.Var]
 entryVar (AST.Var t is) = map (\i -> (i, ST.Var t (-1))) is
-
--- lookupSize
--- looks up the size of a given AST.TypeName in a PartialTable
-lookupSize :: PartialTable -> AST.TypeName -> Int
-lookupSize (PartialTable rs _) (AST.Alias alias)
-  | ST.isTableKey alias rs
-    = length . ST.unFields . fromJust $ lookup alias rs
-lookupSize st@(PartialTable _ as) (AST.Alias alias)
-  | ST.isTableKey alias as
-    = s * lookupSize st t
-  where (ST.Array t s) = fromJust $ lookup alias as
-lookupSize _ _ = 1
 
 -- checkAssignRef
 -- Checks that an assignment is valid given the types

@@ -1,7 +1,7 @@
 module RooOzCodeGen where 
 
-import RooAST as AST
-import RooSymbolTable as ST
+import qualified RooAST as AST
+import qualified RooSymbolTable as ST
 
 import Control.Monad.State
 import Control.Monad.Except
@@ -282,7 +282,7 @@ genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
               $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
-    stmts <- repeatGen (genStmt $ st { unProcedures = (name, proc):ps }) ss
+    stmts <- repeatGen (genStmt $ st { ST.unProcedures = (name, proc):ps }) ss
     if stackSize > 0
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
@@ -307,9 +307,9 @@ genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
       lOffset <- maybeErr ("Unknown parameter `" ++ lAlias ++ "`")
-                 $ getLocalOffset st lAlias
+                 $ ST.getLocalOffset st lAlias
       rOffset <- maybeErr ("Unknown parameter `" ++ rAlias ++ "`")
-                 $ getLocalOffset st rAlias
+                 $ ST.getLocalOffset st rAlias
       return $ [ Oz_load 0 rOffset
                , Oz_store lOffset 0
                ]
@@ -404,7 +404,7 @@ genLValue :: ST.SymbolTable -> AST.LValue -> ExceptStateGen [OzCode]
 genLValue st (AST.LId alias) = 
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-              $ getLocalOffset st alias
+              $ ST.getLocalOffset st alias
     r <- nextRegister
     if ST.isRef st alias 
     then return $ [ Oz_load r offset ]
@@ -412,8 +412,8 @@ genLValue st (AST.LId alias) =
 genLValue st (AST.LField alias field) = 
   do 
     aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-               $ getLocalOffset st alias
-    let fOffset = unFOffset $ getField (ST.getRecord st alias) field
+               $ ST.getLocalOffset st alias
+    let fOffset = ST.unFOffset $ ST.getField (ST.getRecord st alias) field
     r <- nextRegister
     if ST.isRef st alias 
     then let r' = r + 1 in
@@ -425,7 +425,7 @@ genLValue st (AST.LField alias field) =
 genLValue st (AST.LInd alias e) = -- TODO: fix records
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-              $ getLocalOffset st alias
+              $ ST.getLocalOffset st alias
     r <- getRegister
     eCode <- genExpr st e
     let r' = r + 1
@@ -491,34 +491,34 @@ getReadBuiltin :: AST.ExprType -> ExceptStateGen String
 getReadBuiltin t = liftEither $ ("read_" ++) <$> getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
-getBinOpCode Op_or  = Oz_or
-getBinOpCode Op_and = Oz_and
-getBinOpCode Op_eq  = Oz_cmp_eq_int
-getBinOpCode Op_neq = Oz_cmp_ne_int
-getBinOpCode Op_lt  = Oz_cmp_lt_int
-getBinOpCode Op_leq = Oz_cmp_le_int
-getBinOpCode Op_gt  = Oz_cmp_gt_int
-getBinOpCode Op_geq = Oz_cmp_ge_int
-getBinOpCode Op_add = Oz_add_int
-getBinOpCode Op_sub = Oz_sub_int
-getBinOpCode Op_mul = Oz_mul_int
-getBinOpCode Op_div = Oz_div_int
+getBinOpCode AST.Op_or  = Oz_or
+getBinOpCode AST.Op_and = Oz_and
+getBinOpCode AST.Op_eq  = Oz_cmp_eq_int
+getBinOpCode AST.Op_neq = Oz_cmp_ne_int
+getBinOpCode AST.Op_lt  = Oz_cmp_lt_int
+getBinOpCode AST.Op_leq = Oz_cmp_le_int
+getBinOpCode AST.Op_gt  = Oz_cmp_gt_int
+getBinOpCode AST.Op_geq = Oz_cmp_ge_int
+getBinOpCode AST.Op_add = Oz_add_int
+getBinOpCode AST.Op_sub = Oz_sub_int
+getBinOpCode AST.Op_mul = Oz_mul_int
+getBinOpCode AST.Op_div = Oz_div_int
 
 getUnOpCode :: AST.UnOp -> (RegNum -> RegNum -> OzCode)
-getUnOpCode Op_not = Oz_not
-getUnOpCode Op_neg = Oz_neg_int
+getUnOpCode AST.Op_not = Oz_not
+getUnOpCode AST.Op_neg = Oz_neg_int
 
 getLValT :: ST.SymbolTable -> AST.LValue -> AST.ExprType -- TODO
-getLValT st (LId alias) = ST.getProcType st alias
-getLValT st@(ST.SymbolTable _ as _) (LInd alias _)
+getLValT st (AST.LId alias) = ST.getProcType st alias
+getLValT st@(ST.SymbolTable _ as _) (AST.LInd alias _)
   | AST.isArrayT aliasType
     = ST.getArrayType aliasType
   where aliasType = ST.getProcType st alias
-getLValT st@(ST.SymbolTable rs _ _) (LField alias field)
+getLValT st@(ST.SymbolTable rs _ _) (AST.LField alias field)
   | AST.isRecordT aliasType
     = ST.getFieldType rs aliasType field
   where aliasType = ST.getProcType st alias
-getLValT st@(ST.SymbolTable rs _ _) (LIndField alias _ field) 
+getLValT st@(ST.SymbolTable rs _ _) (AST.LIndField alias _ field) 
   | AST.isArrayT aliasType && AST.isRecordT recordType
     = ST.getFieldType rs recordType field
   where 
@@ -529,8 +529,8 @@ getLValT _ _ = AST.ErrorT
 p = "record { integer field } rec; procedure main () { writeln \"Hello, World!\"; } procedure r () rec r; { writeln rec.field; }"
 p2 = "array [1] integer arr; procedure main () { writeln \"Hello, World!\"; } procedure r () arr a; { writeln a[0]; }"
 ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})
-pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst IntT 0) (AST.IntConst IntT 0))]
-                       , AST.Procedure "b" [] [] [ AST.Writeln (AST.BinOpExpr AST.BoolT AST.Op_and (AST.UnOpExpr AST.BoolT AST.Op_not (AST.BoolConst BoolT True)) (AST.BoolConst AST.BoolT False))
+pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst AST.IntT 0) (AST.IntConst AST.IntT 0))]
+                       , AST.Procedure "b" [] [] [ AST.Writeln (AST.BinOpExpr AST.BoolT AST.Op_and (AST.UnOpExpr AST.BoolT AST.Op_not (AST.BoolConst AST.BoolT True)) (AST.BoolConst AST.BoolT False))
                                                  , AST.While (AST.BoolConst AST.BoolT False) [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
                                                  ] -- incomplete
                        ]
@@ -538,6 +538,6 @@ st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("
                                                                             , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
                                                                             ]}
 pr2 = AST.Program [] [AST.Array 1 (AST.Atomic AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
-st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {unAType = AST.Atomic AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], unStackSize = 1})]}
+st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {ST.unAType = AST.Atomic AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], ST.unStackSize = 1})]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
 

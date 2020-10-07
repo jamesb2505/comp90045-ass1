@@ -108,7 +108,7 @@ getProcType st@(SymbolTable _ _ ((_,Procedure ps vs _):_)) name
     = case lookup name ps of
         Nothing            -> AST.ErrorT
         Just (Param t _ _) -> getType st t
-  | isTableKey name (traceShow vs vs)
+  | isTableKey name vs
     = case lookup name vs of
         Nothing        -> AST.ErrorT
         Just (Var t _) -> getType st t

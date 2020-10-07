@@ -15,7 +15,7 @@ GEN   = $(patsubst %,$(SRC)/%,$(_GEN))
 _DEPS = RooAST.hs PrettyRoo.hs RooSymbolTable.hs RooOzCodeGen.hs
 DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(GEN)
 
-.PHONY: all gen clean CLEAN cleangen
+.PHONY: all gen clean cleanly
 
 all: $(EXE)
 
@@ -23,14 +23,12 @@ gen: $(GEN)
 
 clean:
 	rm -f $(SRC)/*.o $(SRC)/*.hi $(APP)/*.o $(APP)/*.hi
-
-CLEAN: clean
-	rm -f $(EXE)
-
-cleangen: 
 	rm -f $(GEN)
 
-cleanly: all clean
+cleanly: clean all clean
+
+clobber: clean
+	rm -f $(EXE)
 
 $(EXE): $(DEPS)
 	$(HC) $(HCFLAGS) $(MAIN) $^ -o $(EXE)

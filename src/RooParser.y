@@ -1,7 +1,7 @@
 {
-module RooParser (
-  runParser
-) where
+module RooParser 
+  ( runParser
+  ) where
 
 import qualified RooSymbolTable as ST
 import qualified RooLexer as L
@@ -10,8 +10,6 @@ import qualified RooAST as AST
 import qualified Data.Containers.ListUtils as LU
 import Control.Monad
 import Data.Maybe
-
-import Debug.Trace
 }
 
 %name runHappy program
@@ -733,7 +731,7 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
         validArg :: ST.Param -> AST.Expr -> Bool
         validArg (ST.Param t m _) a =
           let tType = ST.getType st t in
-            traceShow (AST.getExprType a) (AST.getExprType a) == ST.getType st t
+            AST.getExprType a == ST.getType st t
             && (AST.isLVal a || m == AST.Val)
                
 

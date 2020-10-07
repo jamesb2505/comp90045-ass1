@@ -7,8 +7,6 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe
-
-import Debug.Trace
   
 -- LabelNum, RegNum, SlotNum
 -- Type aliases for Ints, specifying the use of an Int argument
@@ -204,7 +202,7 @@ fmtReg n = "r" ++ show n
 -- printOzCodes
 -- Prints a given [OzCode] with appropiate formatting
 printOzCodes :: [OzCode] -> IO ()
-printOzCodes code = putStr . unlines $ map show code
+printOzCodes code = putStr . dropWhile (== '\t') . unlines $ map show code
 
 -- nextLabel
 -- Returns the next Label for a generator, post-incrementing the counter
@@ -531,26 +529,3 @@ getBinOpCode AST.Op_div = Oz_div_int
 getUnOpCode :: AST.UnOp -> (RegNum -> RegNum -> OzCode)
 getUnOpCode AST.Op_not = Oz_not
 getUnOpCode AST.Op_neg = Oz_neg_int
-
-p = "procedure main () integer i; { call r (i); } procedure r (integer i) { writeln i; }"
-p2 = "array [1] integer arr; procedure main () { writeln \"Hello, World!\"; } procedure r () arr a; { writeln a[0]; }"
-ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})
-pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst AST.IntT 0) (AST.IntConst AST.IntT 0))]
-                       , AST.Procedure "b" [] [] [ AST.Writeln (AST.BinOpExpr AST.BoolT AST.Op_and (AST.UnOpExpr AST.BoolT AST.Op_not (AST.BoolConst AST.BoolT True)) (AST.BoolConst AST.BoolT False))
-                                                 , AST.While (AST.BoolConst AST.BoolT False) [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
-                                                 ] -- incomplete
-                       ]
-st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})
-                                                                            , ("b",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 1})
-                                                                            ]}
-pr2 = AST.Program [] [AST.Array 1 (AST.Atomic AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
-st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {ST.unAType = AST.Atomic AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], ST.unStackSize = 1})]}
-s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
-
-
-prog = AST.Program [AST.Record [AST.Field AST.IntType "field"] "rec"] [] [AST.Procedure "main" [] [AST.Var (AST.Alias "rec") ["r"]] [AST.Call "r" [AST.LVal (AST.RecordT "rec") (AST.LId "r")]],AST.Procedure "r" [AST.ParamAlias "rec" "r"] [] [AST.Writeln (AST.LVal AST.IntT (AST.LField "r" "field"))]]
-symt = ST.SymbolTable {ST.unRecords = [("rec",ST.Record {ST.unFields = [("field",ST.Field {ST.unFType = AST.IntType, ST.unFOffset = 0})]})], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [("r",ST.Var {ST.unVType = AST.Alias "rec", ST.unVOffset = 0})], ST.unStackSize = 1}),("r",ST.Procedure {ST.unParams = [("r",ST.Param {ST.unPType = AST.Alias "rec", ST.unMode = AST.Ref, ST.unPOffset = 0})], ST.unVars = [], ST.unStackSize = 1})]}
-
-prog2 = AST.Program [] [] [AST.Procedure "main" [] [AST.Var (AST.Atomic AST.IntType) ["i"]] [AST.Call "r" [AST.LVal AST.IntT (AST.LId "i")]],AST.Procedure "r" [AST.ParamAtomic AST.IntType AST.Ref "i"] [] [AST.Writeln (AST.LVal AST.IntT (AST.LId "i"))]]
-symt2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [("i",ST.Var {ST.unVType = AST.Atomic AST.IntType, ST.unVOffset = 0})], ST.unStackSize = 1}),("r",ST.Procedure {ST.unParams = [("i",ST.Param {ST.unPType = AST.Atomic AST.IntType, ST.unMode = AST.Ref, ST.unPOffset = 0})], ST.unVars = [], ST.unStackSize = 1})]}
-

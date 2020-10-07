@@ -4,7 +4,7 @@ module RooLexer
   , Token(..)
   , AlexPosn(..)
   , Lexeme
-) where
+  ) where
 }
 
 %wrapper "posn"
@@ -167,10 +167,12 @@ instance Show Token where
 
 type Lexeme = (AlexPosn, Token)
 
--- String -> Token, Token Builder
+-- tok
+-- String -> Token, Lexeme builder
 tok :: (String -> Token) -> AlexPosn -> String -> Lexeme
 tok f p s = (p, f s)
 
+-- cTok
 -- Constant Token Builder
 cTok :: Token -> AlexPosn -> String -> Lexeme
 cTok t p _ = (p, t)
@@ -189,11 +191,10 @@ runLexer str = go (alexStartPos,'\n',[],str)
         AlexError ((AlexPn _ l c),_,_,_) 
           -> let ls = lines str in
              let err = if c > 0 && l > 0 && l <= length ls
-                       then ":\n" ++ (ls !! (l - 1)) ++ "\n" 
+                       then "\n" ++ (ls !! (l - 1)) ++ "\n" 
                             ++ replicate (c - 1) ' ' ++ "^ here"
                        else ""
-             in Left $ "Lexical error at line " ++ show l 
-                       ++ ", column " ++ (show c) ++ err
+             in Left $ show l ++ ":" ++ show c ++ ": lexical error" ++ err
         AlexSkip inp' len     
           -> go inp' 
         AlexToken inp' len act 

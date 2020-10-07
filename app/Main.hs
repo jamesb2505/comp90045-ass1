@@ -15,7 +15,8 @@ module Main (main) where
 
 import RooParser (runParser)
 import RooLexer (runLexer)
-import RooOzCodeGen (runCodeGen, printOzCodes)
+import RooOzCodeGen (runCodeGen)
+import OzCode (printOzCodes)
 import RooAST (Program)
 import RooSymbolTable (SymbolTable)
 import PrettyRoo (prettyPrint)

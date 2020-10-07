@@ -390,7 +390,7 @@ stmt -- ~ :: { AST.Stmt }
     ; $4.records = $$.records 
     ; $2.symtab = $$.symtab
     ; $4.symtab = $$.symtab 
-    ; where unless (AST.isIntT $2.etype)
+    ; where unless (AST.isBoolT $2.etype)
                    (Left $ fmtPos (fst $1) ++ ": bad if-then condition type")
     }
   | while expr do stmts od           

@@ -120,13 +120,14 @@ genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
 genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
-      lOffset <- maybeErr ("Unknown parameter `" ++ lAlias ++ "`")
-                 $ ST.getLocalOffset st lAlias
-      rOffset <- maybeErr ("Unknown parameter `" ++ rAlias ++ "`")
-                 $ ST.getLocalOffset st rAlias
+      lOffset <- getOffset lAlias
+      rOffset <- getOffset rAlias
       return $ [ Oz_load 0 rOffset
                , Oz_store lOffset 0
                ]
+  where 
+    getOffset alias 
+      = getLocalOffsetErr st alias ("Unknown variable `" ++ alias ++ "`")
 genStmt st (AST.Assign l e) =
   do 
     putRegister 0
@@ -223,16 +224,16 @@ genStmts st ss = repeatGen (genStmt st) ss
 genLValue :: ST.SymbolTable -> AST.LValue -> GenState [OzCode]
 genLValue st (AST.LId alias) = 
   do 
-    offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-              $ ST.getLocalOffset st alias
+    offset <- getLocalOffsetErr st alias 
+               ("Unknown parameter/variable `" ++ alias ++ "`")
     r <- nextRegister
     if ST.isRef st alias 
     then return $ [ Oz_load r offset ]
     else return $ [ Oz_load_address r offset ]
 genLValue st (AST.LField alias field) = 
   do 
-    aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-               $ ST.getLocalOffset st alias
+    aOffset <- getLocalOffsetErr st alias 
+                 ("Unknown parameter/variable `" ++ alias ++ "`")
     rAlias <- liftEither . getRecord $ ST.getProcType st alias
     record <- maybeErr ("Unknown record type `" ++ rAlias ++ "`")
               $ ST.getRecord st rAlias
@@ -246,43 +247,47 @@ genLValue st (AST.LField alias field) =
                   , Oz_int_const r' fOffset
                   , Oz_sub_offset r r r'
                   ]
-    else return $ [ Oz_load_address r (aOffset - fOffset) ]
+    else return $ [ Oz_load_address r $ aOffset + fOffset ]
   where 
     getRecord (AST.RecordT rAlias) 
       = Right rAlias
     getRecord _                    
       = Left $ "Incorrect type for `" ++ alias ++ "`" 
-genLValue st (AST.LInd alias e) =
+genLValue st@(ST.SymbolTable _ as _) (AST.LInd alias e) =
   do 
-    offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-              $ ST.getLocalOffset st alias
-    let AST.ArrayT aAlias _ = ST.getProcType st alias
-    let size = ST.lookupSize st $ AST.Alias aAlias
+    offset <- getLocalOffsetErr st alias 
+               ("Unknown parameter/variable `" ++ alias ++ "`")
+    let AST.ArrayT aAlias size = ST.getProcType st alias
+    size <- maybeErr ("Uknown array type `" ++ aAlias ++ "`")
+            $ div (ST.lookupSize st $ AST.Alias aAlias)
+              <$> ST.unSize <$> lookup aAlias as
     r <- getRegister
     eCode <- genExpr st e
     let r' = r + 1
     return $ eCode
-          ++ [ Oz_int_const r' size
+          ++ [ Oz_int_const r' $ size
              , Oz_mul_int r r' r
              , Oz_load_address r' offset
              , Oz_sub_offset r r' r
              ]
-genLValue st (AST.LIndField alias e field) =
+genLValue st@(ST.SymbolTable _ as _) (AST.LIndField alias e field) =
   do 
-    aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
-               $ ST.getLocalOffset st alias
+    aOffset <- getLocalOffsetErr st alias 
+                 ("Unknown parameter/variable `" ++ alias ++ "`")
     (aAlias, rAlias) <- liftEither . getArrayRecord $ ST.getProcType st alias
     record <- maybeErr ("Unknown record type `" ++ rAlias ++ "`")
               $ ST.getRecord st rAlias
     fOffset <- maybeErr ("Unknown field `" ++ field 
                          ++ "` of `" ++ rAlias ++"`")
                $ ST.unFOffset <$> ST.getField record field
-    let size = ST.lookupSize st $ AST.Alias aAlias
+    size <- maybeErr ("Uknown array type `" ++ aAlias ++ "`")
+            $ div (ST.lookupSize st $ AST.Alias aAlias)
+              <$> ST.unSize <$> lookup aAlias as
     r <- getRegister
     eCode <- genExpr st e
     let r' = r + 1
     return $ eCode
-          ++ [ Oz_int_const r' size
+          ++ [ Oz_int_const r' $ size
              , Oz_mul_int r r' r
              , Oz_load_address r' aOffset
              , Oz_sub_offset r r' r
@@ -339,3 +344,7 @@ genExpr st (AST.UnOpExpr _ op a) =
 genParam :: ST.SymbolTable -> ST.Param -> AST.Expr -> GenState [OzCode]
 genParam st (ST.Param _ AST.Ref _) (AST.LVal _ lval) = genLValue st lval
 genParam st _                      e                 = genExpr st e
+
+
+getLocalOffsetErr :: ST.SymbolTable -> AST.Ident -> String -> GenState Int
+getLocalOffsetErr st alias err = maybeErr err $ ST.getLocalOffset st alias

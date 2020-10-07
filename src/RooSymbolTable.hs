@@ -136,7 +136,7 @@ getFieldType _ _ _ = AST.ErrorT
 -- ErrorT is returned if alias (Ident) is not found in any context
 getArrayType :: AST.ExprType -> AST.ExprType
 getArrayType (AST.ArrayT _ t) = t
-getArrayType _              = AST.ErrorT
+getArrayType _                = AST.ErrorT
 
 getLValType :: SymbolTable -> AST.LValue -> AST.ExprType
 getLValType st (AST.LId alias) = getProcType st alias

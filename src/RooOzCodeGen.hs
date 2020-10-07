@@ -7,6 +7,8 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe
+
+import Debug.Trace
   
 -- LabelNum, RegNum, SlotNum
 -- Type aliases for Ints, specifying the use of an Int argument
@@ -19,10 +21,10 @@ type SlotNum = Int
 data Gen = Gen LabelNum RegNum
   deriving (Show, Eq)
 
--- ExceptStateGen
+-- GenState
 -- ExceptT wrapped (Stage Gen)
 -- Used to propogate errors through a successive generators
-type ExceptStateGen = ExceptT String (State Gen)
+type GenState = ExceptT String (State Gen)
 
 -- Label
 -- Data type for two types of labels, with custom Show instance
@@ -94,105 +96,105 @@ data OzCode
 
 instance Show OzCode where
   show (Oz_push_stack_frame i)   
-    = "  push_stack_frame " ++ show i
+    = "\tpush_stack_frame " ++ show i
   show (Oz_pop_stack_frame i)    
-    = "  pop_stack_frame " ++ show i
+    = "\tpop_stack_frame " ++ show i
   show (Oz_store s r)            
-    = "  store " ++ intercalate ", " [ show s, fmtReg r ]
+    = "\tstore " ++ intercalate ", " [ show s, fmtReg r ]
   show (Oz_load r s)             
-    = "  load " ++ intercalate ", " [ fmtReg r, show s ]
+    = "\tload " ++ intercalate ", " [ fmtReg r, show s ]
   show (Oz_load_address r s)     
-    = "  load_address " ++ intercalate ", " [ fmtReg r, show s ]
+    = "\tload_address " ++ intercalate ", " [ fmtReg r, show s ]
   show (Oz_load_indirect rI rJ)  
-    = "  load_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tload_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_store_indirect rI rJ) 
-    = "  store_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tstore_indirect " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_int_const r i)       
-    = "  int_const " ++ intercalate ", " [ fmtReg r, show i ]
+    = "\tint_const " ++ intercalate ", " [ fmtReg r, show i ]
   show (Oz_real_const r d)      
-    = "  real_const " ++ intercalate ", " [ fmtReg r, show d ]
+    = "\treal_const " ++ intercalate ", " [ fmtReg r, show d ]
   show (Oz_string_const r s)    
-    = "  string_const " ++ fmtReg r ++ ", \"" ++ s ++ "\"" 
+    = "\tstring_const " ++ fmtReg r ++ ", \"" ++ s ++ "\"" 
   show (Oz_add_int rI rJ rK)
-    = "  add_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tadd_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_add_real rI rJ rK)
-    = "  add_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tadd_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_add_offset rI rJ rK)
-    = "  add_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tadd_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_int rI rJ rK)
-    = "  sub_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tsub_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_real rI rJ rK)
-    = "  sub_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tsub_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_sub_offset rI rJ rK)
-    = "  sub_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tsub_offset " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_mul_int rI rJ rK)
-    = "  mul_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tmul_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_mul_real rI rJ rK)
-    = "  mul_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tmul_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_div_int rI rJ rK)
-    = "  div_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tdiv_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_div_real rI rJ rK)
-    = "  div_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tdiv_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_neg_int rI rJ)
-    = "  neg_int " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tneg_int " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_neg_real rI rJ)
-    = "  neg_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tneg_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_cmp_eq_int rI rJ rK)
-    = "  cmp_eq_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_eq_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ne_int rI rJ rK)
-    = "  cmp_ne_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_ne_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_gt_int rI rJ rK)
-    = "  cmp_gt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_gt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ge_int rI rJ rK)
-    = "  cmp_ge_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_ge_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_lt_int rI rJ rK)
-    = "  cmp_lt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_lt_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_le_int rI rJ rK)
-    = "  cmp_le_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_le_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_eq_real rI rJ rK)
-    = "  cmp_eq_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_eq_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ne_real rI rJ rK)
-    = "  cmp_ne_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_ne_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_gt_real rI rJ rK)
-    = "  cmp_gt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_gt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_ge_real rI rJ rK)
-    = "  cmp_ge_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_ge_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_lt_real rI rJ rK)
-    = "  cmp_lt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_lt_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_cmp_le_real rI rJ rK)
-    = "  cmp_le_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tcmp_le_real " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_and rI rJ rK)
-    = "  and " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tand " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_or rI rJ rK)
-    = "  or " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
+    = "\tor " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_not rI rJ)            
-    = "  not " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tnot " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_int_to_real rI rJ)    
-    = "  int_to_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tint_to_real " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_move rI rJ)           
-    = "  move " ++ intercalate ", " (map fmtReg [ rI, rJ ])
+    = "\tmove " ++ intercalate ", " (map fmtReg [ rI, rJ ])
   show (Oz_branch_on_true r l)  
-    = "  branch_on_true " ++ intercalate ", " [ fmtReg r, show l ]
+    = "\tbranch_on_true " ++ intercalate ", " [ fmtReg r, show l ]
   show (Oz_branch_on_false r l) 
-    = "  branch_on_false " ++ intercalate ", " [ fmtReg r, show l ]
+    = "\tbranch_on_false " ++ intercalate ", " [ fmtReg r, show l ]
   show (Oz_branch_uncond l)      
-    = "  branch_uncond " ++ show l
+    = "\tbranch_uncond " ++ show l
   show (Oz_label l)               
     = show l ++ ":"
   show (Oz_call l)               
-    = "  call " ++ show l
+    = "\tcall " ++ show l
   show (Oz_call_builtin s)       
-    = "  call_builtin " ++ s
+    = "\tcall_builtin " ++ s
   show (Oz_return)               
-    = "  return"
+    = "\treturn"
   show (Oz_halt)                 
     = "halt"
   show (Oz_debug_reg r)         
-    = "  debug_reg " ++ fmtReg r
+    = "\tdebug_reg " ++ fmtReg r
   show (Oz_debug_slot s)         
-    = "  debug_slot " ++ show s
+    = "\tdebug_slot " ++ show s
   show (Oz_debug_stack)          
-    = "  debug_stack"
+    = "\tdebug_stack"
 
 -- fmtReg
 -- Formates a RegNum
@@ -206,7 +208,7 @@ printOzCodes code = putStr . unlines $ map show code
 
 -- nextLabel
 -- Returns the next Label for a generator, post-incrementing the counter
-nextLabel :: ExceptStateGen Label
+nextLabel :: GenState Label
 nextLabel =
   do
     Gen ln rn <- lift get
@@ -215,7 +217,7 @@ nextLabel =
 
 -- getRegister
 -- Returns the current RegNum for a generator
-getRegister :: ExceptStateGen RegNum
+getRegister :: GenState RegNum
 getRegister = 
   do
     Gen _ rn <- lift get
@@ -223,7 +225,7 @@ getRegister =
 
 -- nextRegister
 -- Returns the next RegNum for a generator, post-incrementing the counter
-nextRegister :: ExceptStateGen RegNum
+nextRegister :: GenState RegNum
 nextRegister = 
   do
     Gen ln rn <- lift get
@@ -232,16 +234,16 @@ nextRegister =
 
 -- putRegister 
 -- Sets the RegNum inside the State
-putRegister :: RegNum -> ExceptStateGen ()
+putRegister :: RegNum -> GenState ()
 putRegister r =
   do
     Gen ln _ <- lift get
     lift . put $ Gen ln r
 
 -- maybeErr
--- Lifts a Maybe a into a ExceptStateGen, using the input String for the 
+-- Lifts a Maybe a into a GenState, using the input String for the 
 -- Left value on Nothing
-maybeErr :: String -> Maybe a -> ExceptStateGen a
+maybeErr :: String -> Maybe a -> GenState a
 maybeErr a Nothing  = liftEither $ Left a
 maybeErr _ (Just b) = liftEither $ Right b
 
@@ -258,12 +260,12 @@ runCodeGen prog st = evalState (runExceptT $ genProgram st prog) initGenState
 
 -- repeatGen
 -- Repeats a generator over a list, concatenating the results
-repeatGen :: (a -> ExceptStateGen [OzCode]) -> [a] -> ExceptStateGen [OzCode]
+repeatGen :: (a -> GenState [OzCode]) -> [a] -> GenState [OzCode]
 repeatGen gen = liftM concat . mapM gen
     
 -- genProgram
 -- Generates a [OzCode] for a given AST.Program
-genProgram :: ST.SymbolTable -> AST.Program -> ExceptStateGen [OzCode]
+genProgram :: ST.SymbolTable -> AST.Program -> GenState [OzCode]
 genProgram st (AST.Program _ _ ps) =
   do 
     procs <- repeatGen (genProcedure st) ps
@@ -274,12 +276,12 @@ genProgram st (AST.Program _ _ ps) =
 
 -- genProcedure
 -- Generates a [OzCode] for a given AST.Program
-genProcedure :: ST.SymbolTable -> AST.Procedure -> ExceptStateGen [OzCode]
+genProcedure :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
 genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
     proc@(ST.Procedure params vars stackSize) 
       <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
-              $ lookup name ps
+                  $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
     stmts <- repeatGen (genStmt $ st { ST.unProcedures = (name, proc):ps }) ss
@@ -287,8 +289,8 @@ genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
     then return $ Oz_label (ProcLabel name)
                 : Oz_push_stack_frame stackSize
                 : pCode
-              ++ [ Oz_int_const 0 0 ]
-              ++ [ Oz_store (i + nParams) 0 | i <- [0..stackSize - 1] ]
+              ++ (if stackSize > nParams then [Oz_int_const 0 0] else [])
+              ++ [ Oz_store (i + nParams) 0 | i <- [0..stackSize - nParams - 1] ]
               ++ stmts 
               ++ [ Oz_pop_stack_frame stackSize
                  , Oz_return
@@ -302,7 +304,7 @@ genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
 -- Generates a [OzCode] for a given AST.Stmt
 -- It is assumed that the current procedure is at the top of the 
 -- procedures of the ST.SymbolTable
-genStmt :: ST.SymbolTable -> AST.Stmt -> ExceptStateGen [OzCode]
+genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
 genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
@@ -326,7 +328,7 @@ genStmt st (AST.Read l) =
   do 
     putRegister 1
     lCode <- genLValue st l
-    reader <- getReadBuiltin $ getLValT st l
+    reader <- getReadBuiltin $ ST.getLValType st l
     return $ Oz_call_builtin reader
            : lCode
           ++ [ Oz_store_indirect 1 0 ]
@@ -349,10 +351,10 @@ genStmt st (AST.Writeln e) =
 genStmt st (AST.If e ss) =
   do 
     putRegister 0
+    endLabel <- nextLabel
     eCode <- genExpr st e
     putRegister 0
     ssCode <- genStmts st ss
-    endLabel <- nextLabel
     return $ eCode
           ++ [ Oz_branch_on_false 0 endLabel ]
           ++ ssCode
@@ -360,15 +362,17 @@ genStmt st (AST.If e ss) =
 genStmt st (AST.IfElse e ts fs) =
   do 
     putRegister 0
+    falseLabel <- nextLabel
+    endLabel <- nextLabel
     eCode <- genExpr st e
     tsCode <- genStmts st ts
     fsCode <- genStmts st fs
-    falseLabel <- nextLabel
-    endLabel <- nextLabel
     return $ eCode
           ++ [ Oz_branch_on_false 0 falseLabel ]
           ++ tsCode
-          ++ [ Oz_branch_uncond endLabel ]
+          ++ [ Oz_branch_uncond endLabel
+             , Oz_label falseLabel 
+             ]
           ++ fsCode
           ++ [ Oz_label endLabel ]
 genStmt st (AST.While e ss) =
@@ -386,21 +390,28 @@ genStmt st (AST.While e ss) =
           ++ [ Oz_branch_uncond startLabel
              , Oz_label endLabel
              ]
-genStmt st (AST.Call _ _) = -- TODO
+genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) = -- TODO: validate
   do 
-    putRegister 0
-    return []
+    proc@(ST.Procedure paramTable _ _) 
+      <- maybeErr ("Unknown procedure `" ++ name ++ "`")
+                  $ lookup name ps
+    let params = map snd paramTable
+    pCode <- repeatGen genParam' $ zip3 [0..] params args 
+    return $ pCode
+          ++ [ Oz_call $ ProcLabel name ]
+  where genParam' (i, p, a) = putRegister i >> genParam st p a
+           
 
 -- genStmts
 -- Generates a [OzCode] for a given [AST.Program]
-genStmts :: ST.SymbolTable -> [AST.Stmt] -> ExceptStateGen [OzCode]
+genStmts :: ST.SymbolTable -> [AST.Stmt] -> GenState [OzCode]
 genStmts st ss = repeatGen (genStmt st) ss
 
 -- genLValue
 -- Generates a [OzCode] for a given AST.LValue
 -- It is assumed that the current procedure is at the top of the 
 -- procedures of the ST.SymbolTable
-genLValue :: ST.SymbolTable -> AST.LValue -> ExceptStateGen [OzCode]
+genLValue :: ST.SymbolTable -> AST.LValue -> GenState [OzCode]
 genLValue st (AST.LId alias) = 
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
@@ -413,7 +424,8 @@ genLValue st (AST.LField alias field) =
   do 
     aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
                $ ST.getLocalOffset st alias
-    let fOffset = ST.unFOffset $ ST.getField (ST.getRecord st alias) field
+    let AST.RecordT rAlias = ST.getProcType st alias
+    let fOffset = ST.unFOffset $ ST.getField (ST.getRecord st rAlias) field
     r <- nextRegister
     if ST.isRef st alias 
     then let r' = r + 1 in
@@ -422,7 +434,7 @@ genLValue st (AST.LField alias field) =
                   , Oz_sub_offset r r r'
                   ]
     else return $ [ Oz_load_address r (aOffset - fOffset) ]
-genLValue st (AST.LInd alias e) = -- TODO: fix records
+genLValue st (AST.LInd alias e) = -- TODO: fix records (size != 1)
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
               $ ST.getLocalOffset st alias
@@ -433,7 +445,7 @@ genLValue st (AST.LInd alias e) = -- TODO: fix records
           ++ [ Oz_load_address r' offset
              , Oz_sub_offset r r' r
              ]
-genLValue st (AST.LIndField alias e field) = -- TODO
+genLValue st (AST.LIndField alias e field) = -- TODO: implement
   do 
     putRegister 0
     eCode <- genExpr st e
@@ -443,11 +455,13 @@ genLValue st (AST.LIndField alias e field) = -- TODO
 -- Generates a [OzCode] for a given AST.Expr
 -- It is assumed that the current procedure is at the top of the 
 -- procedures of the ST.SymbolTable
-genExpr :: ST.SymbolTable -> AST.Expr -> ExceptStateGen [OzCode]
+genExpr :: ST.SymbolTable -> AST.Expr -> GenState [OzCode]
 genExpr st (AST.LVal _ lval) = 
   do 
+    r <- getRegister
     lCode <- genLValue st lval
     return $ lCode
+          ++ [ Oz_load_indirect r r ]
 genExpr _ (AST.BoolConst _ b) =
   do 
     r <- nextRegister
@@ -478,16 +492,26 @@ genExpr st (AST.UnOpExpr _ op a) =
     return $ aCode
           ++ [ getUnOpCode op r r ]
 
+genParam :: ST.SymbolTable -> ST.Param -> AST.Expr -> GenState [OzCode]
+genParam st (ST.Param _ AST.Ref _) (AST.LVal _ lval) =
+  do 
+    lCode <- genLValue st lval
+    return $ lCode 
+genParam st _ e =
+  do 
+    eCode <- genExpr st e
+    return $ eCode
+
 getBuiltinSuffix :: AST.ExprType -> Either String String
 getBuiltinSuffix AST.BoolT = Right "bool"
 getBuiltinSuffix AST.IntT  = Right "int"
 getBuiltinSuffix AST.StrT  = Right "string"
 getBuiltinSuffix t         = Left $ "no builtin for " ++ show t
 
-getPrintBuiltin :: AST.ExprType -> ExceptStateGen String
+getPrintBuiltin :: AST.ExprType -> GenState String
 getPrintBuiltin t = liftEither $ ("print_" ++) <$> getBuiltinSuffix t
 
-getReadBuiltin :: AST.ExprType -> ExceptStateGen String
+getReadBuiltin :: AST.ExprType -> GenState String
 getReadBuiltin t = liftEither $ ("read_" ++) <$> getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
@@ -508,25 +532,7 @@ getUnOpCode :: AST.UnOp -> (RegNum -> RegNum -> OzCode)
 getUnOpCode AST.Op_not = Oz_not
 getUnOpCode AST.Op_neg = Oz_neg_int
 
-getLValT :: ST.SymbolTable -> AST.LValue -> AST.ExprType -- TODO
-getLValT st (AST.LId alias) = ST.getProcType st alias
-getLValT st@(ST.SymbolTable _ as _) (AST.LInd alias _)
-  | AST.isArrayT aliasType
-    = ST.getArrayType aliasType
-  where aliasType = ST.getProcType st alias
-getLValT st@(ST.SymbolTable rs _ _) (AST.LField alias field)
-  | AST.isRecordT aliasType
-    = ST.getFieldType rs aliasType field
-  where aliasType = ST.getProcType st alias
-getLValT st@(ST.SymbolTable rs _ _) (AST.LIndField alias _ field) 
-  | AST.isArrayT aliasType && AST.isRecordT recordType
-    = ST.getFieldType rs recordType field
-  where 
-    aliasType = ST.getProcType st alias
-    recordType = ST.getArrayType aliasType
-getLValT _ _ = AST.ErrorT
-
-p = "record { integer field } rec; procedure main () { writeln \"Hello, World!\"; } procedure r () rec r; { writeln rec.field; }"
+p = "procedure main () integer i; { call r (i); } procedure r (integer i) { writeln i; }"
 p2 = "array [1] integer arr; procedure main () { writeln \"Hello, World!\"; } procedure r () arr a; { writeln a[0]; }"
 ps = (AST.Program [] [] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]],ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0})]})
 pr = AST.Program [] [] [ AST.Procedure "main" [] [] [AST.Writeln (AST.BinOpExpr AST.IntT AST.Op_add (AST.IntConst AST.IntT 0) (AST.IntConst AST.IntT 0))]
@@ -540,4 +546,11 @@ st = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [ ("
 pr2 = AST.Program [] [AST.Array 1 (AST.Atomic AST.IntType) "arr"] [AST.Procedure "main" [] [] [AST.Writeln (AST.StrConst AST.StrT "Hello, World!")],AST.Procedure "r" [] [AST.Var (AST.Alias "arr") ["a"]] [AST.Read (AST.LInd "a" (AST.IntConst AST.IntT 0))]]
 st2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [("arr",ST.Array {ST.unAType = AST.Atomic AST.IntType, ST.unSize = 1})], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [], ST.unStackSize = 0}),("r",ST.Procedure {ST.unParams = [], ST.unVars = [("a",ST.Var {ST.unVType = AST.Alias "arr", ST.unVOffset = 0})], ST.unStackSize = 1})]}
 s = [AST.Writeln (AST.StrConst AST.StrT "Hello, World!"), AST.Writeln (AST.StrConst AST.StrT "Hello, World!")]
+
+
+prog = AST.Program [AST.Record [AST.Field AST.IntType "field"] "rec"] [] [AST.Procedure "main" [] [AST.Var (AST.Alias "rec") ["r"]] [AST.Call "r" [AST.LVal (AST.RecordT "rec") (AST.LId "r")]],AST.Procedure "r" [AST.ParamAlias "rec" "r"] [] [AST.Writeln (AST.LVal AST.IntT (AST.LField "r" "field"))]]
+symt = ST.SymbolTable {ST.unRecords = [("rec",ST.Record {ST.unFields = [("field",ST.Field {ST.unFType = AST.IntType, ST.unFOffset = 0})]})], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [("r",ST.Var {ST.unVType = AST.Alias "rec", ST.unVOffset = 0})], ST.unStackSize = 1}),("r",ST.Procedure {ST.unParams = [("r",ST.Param {ST.unPType = AST.Alias "rec", ST.unMode = AST.Ref, ST.unPOffset = 0})], ST.unVars = [], ST.unStackSize = 1})]}
+
+prog2 = AST.Program [] [] [AST.Procedure "main" [] [AST.Var (AST.Atomic AST.IntType) ["i"]] [AST.Call "r" [AST.LVal AST.IntT (AST.LId "i")]],AST.Procedure "r" [AST.ParamAtomic AST.IntType AST.Ref "i"] [] [AST.Writeln (AST.LVal AST.IntT (AST.LId "i"))]]
+symt2 = ST.SymbolTable {ST.unRecords = [], ST.unArrays = [], ST.unProcedures = [("main",ST.Procedure {ST.unParams = [], ST.unVars = [("i",ST.Var {ST.unVType = AST.Atomic AST.IntType, ST.unVOffset = 0})], ST.unStackSize = 1}),("r",ST.Procedure {ST.unParams = [("i",ST.Param {ST.unPType = AST.Atomic AST.IntType, ST.unMode = AST.Ref, ST.unPOffset = 0})], ST.unVars = [], ST.unStackSize = 1})]}
 

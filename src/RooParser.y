@@ -374,6 +374,8 @@ lval -- ~ :: { AST.LValue }
   : ident                        
     { $$ = AST.LId $1
     ; $$.etype = ST.getProcType $$.symtab $1
+    ; where unless (not $ $$.etype == AST.ErrorT)
+                   (Left $ "unknown type alias for `" ++ $1 ++ "`")
     }
   | ident '.' ident              
     { $$ = AST.LField $1 $3
@@ -713,8 +715,6 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
   where
     procs :: ST.Table ST.Procedure
     procs = ST.unProcedures st
-    stNoProc :: ST.SymbolTable
-    stNoProc = st { ST.unProcedures = [] }
     checkAll :: [AST.Stmt] -> Either String ()
     checkAll ss = sequence_ $ map check ss
     check :: AST.Stmt -> Either String ()
@@ -731,10 +731,10 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
       where 
         callParams = map snd . ST.unParams . fromJust $ lookup proc procs
         validArg :: ST.Param -> AST.Expr -> Bool
-        validArg (ST.Param t m _) a = 
-          let tType = ST.getType stNoProc t in
-            AST.getExprType a == ST.getType stNoProc t
-            && (AST.isLVal a ||  m == AST.Ref)
+        validArg (ST.Param t m _) a =
+          let tType = ST.getType st t in
+            traceShow (AST.getExprType a) (AST.getExprType a) == ST.getType st t
+            && (AST.isLVal a || m == AST.Val)
                
 
 -- entryRecord

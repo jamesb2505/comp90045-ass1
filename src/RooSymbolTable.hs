@@ -8,6 +8,8 @@ import qualified Data.Containers.ListUtils as LU
 import qualified Control.Monad as C
 import qualified Data.Maybe as M
 
+import Debug.Trace
+
 type Entry a = (AST.Ident, a)
 
 type Table a = [Entry a]
@@ -110,7 +112,7 @@ getProcType st@(SymbolTable _ _ ((_,Procedure ps vs _):_)) name
     = case lookup name ps of
         Nothing            -> AST.ErrorT
         Just (Param t _ _) -> getType st t
-  | isTableKey name vs
+  | isTableKey name (traceShow vs vs)
     = case lookup name vs of
         Nothing        -> AST.ErrorT
         Just (Var t _) -> getType st t
@@ -139,6 +141,24 @@ getFieldType _ _ _ = AST.ErrorT
 getArrayType :: AST.ExprType -> AST.ExprType
 getArrayType (AST.ArrayT _ t) = t
 getArrayType _              = AST.ErrorT
+
+getLValType :: SymbolTable -> AST.LValue -> AST.ExprType
+getLValType st (AST.LId alias) = getProcType st alias
+getLValType st@(SymbolTable _ as _) (AST.LInd alias _)
+  | AST.isArrayT aliasType
+    = getArrayType aliasType
+  where aliasType = getProcType st alias
+getLValType st@(SymbolTable rs _ _) (AST.LField alias field)
+  | AST.isRecordT aliasType
+    = getFieldType rs aliasType field
+  where aliasType = getProcType st alias
+getLValType st@(SymbolTable rs _ _) (AST.LIndField alias _ field) 
+  | AST.isArrayT aliasType && AST.isRecordT recordType
+    = getFieldType rs recordType field
+  where 
+    aliasType = getProcType st alias
+    recordType = getArrayType aliasType
+getLValType _ _ = AST.ErrorT
 
 -- lookupSize
 -- looks up the size of a given AST.TypeName in a SymbolTable

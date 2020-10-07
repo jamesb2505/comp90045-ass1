@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module RooSymbolTable where
 
 import qualified RooAST as AST
@@ -7,8 +5,6 @@ import qualified RooAST as AST
 import qualified Data.Containers.ListUtils as LU
 import qualified Control.Monad as C
 import qualified Data.Maybe as M
-
-import Debug.Trace
 
 type Entry a = (AST.Ident, a)
 

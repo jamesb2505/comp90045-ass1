@@ -10,6 +10,8 @@ import qualified RooAST as AST
 import qualified Data.Containers.ListUtils as LU
 import Control.Monad
 import Data.Maybe
+
+import Debug.Trace
 }
 
 %name runHappy program
@@ -24,6 +26,7 @@ import Data.Maybe
 %attribute procs   { ST.Table ST.Procedure }
 %attribute symtab  { ST.SymbolTable }
 %attribute etype   { AST.ExprType }
+%attribute posn    { L.AlexPosn }
 
 %token
   and        { (_, L.T_and) }
@@ -181,12 +184,18 @@ arr -- ~ :: { AST.Array }
   : array '[' number ']' typename ident ';' 
     { $$ = AST.Array $3 $5 $6
     ; $$.arrays = [ entryArray $$ ]
+    ; $5.symtab = ST.SymbolTable $$.records [] []
+    ; $5.posn = fst $4
     }
 
 -- parses a typename (alias or atomic type)
 typename -- ~ :: { AST.TypeName }
   : basetype { $$ = AST.Atomic $1 }
-  | ident    { $$ = AST.Alias $1 }
+  | ident    
+    { $$ = AST.Alias $1 
+    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+                   (Left $ fmtPos $$.posn ++ ": unknown type `" ++ $1 ++ "`")
+    }
 
 -- parses a non-empty sequence of procedure definitions
 procedures -- ~ :: { [AST.Procedure] }
@@ -203,8 +212,7 @@ procedures_ -- ~ :: { [AST.Procedure] }
     { $$ = [$1]
     ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
     ; $1.records = $$.records
-    ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
-    ; $1.symtab = $$.symtab
+    ; $1.arrays = $$.arrays
     }
   | procedures_ proc 
     { $$ = $2:$1
@@ -213,7 +221,6 @@ procedures_ -- ~ :: { [AST.Procedure] }
     ; $1.arrays = $$.arrays
     ; $2.arrays = $$.arrays 
     ; $$.procs = $2.procs ++ $1.procs
-    ; $2.symtab = $1.symtab { ST.unProcedures = $2.procs }
     ; where checkDuplicate (fst $ head $2.procs) (ST.tableKeys $1.procs)
                            "duplicate procedure name"
     }
@@ -225,7 +232,11 @@ proc -- ~ :: { AST.Procedure }
     ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
+    ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
+    ; $4.symtab = $$.symtab
+    ; $6.symtab = $$.symtab
     ; $8.symtab = $$.symtab
+    ; $4.posn = fst $3
     ; where let proc = snd $ head $$.procs in
             checkDuplicates (map fst (ST.unParams proc) 
                              ++ map fst (ST.unVars proc))
@@ -236,16 +247,35 @@ proc -- ~ :: { AST.Procedure }
 -- parses a sequence of parameter declarations
 params -- ~ :: { [AST.Param] }
   : {- empty -}       { $$ = [] }
-  | params_           { $$ = reverse $1 }
+  | params_           
+    { $$ = reverse $1
+    ; $1.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    }
 -- parses a non-empty sequence of parameter declarations
 -- WARNING: output in reverse
 params_ -- ~ :: { [AST.Param] }
-  : param             { $$ = [$1] }
-  | params_ ',' param { $$ = $3:$1 }
+  : param             
+    { $$ = [$1]
+    ; $1.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    }
+  | params_ ',' param 
+    { $$ = $3:$1
+    ; $1.symtab = $$.symtab
+    ; $3.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    ; $3.posn = $$.posn
+    }
 
 -- parses a parameter definition
 param -- ~ :: { AST.Param }
-  : ident ident         { $$ = AST.ParamAlias $1 $2 }
+  : ident ident         
+    { $$ = AST.ParamAlias $1 $2
+    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+                   (Left $ fmtPos $$.posn ++ ": unknown type `" ++ $1 
+                        ++ "` for `" ++ $2 ++ "`")
+    }
   | basetype mode ident { $$ = AST.ParamAtomic $1 $2 $3 }
 
 -- parses a mode (ref or val)
@@ -255,16 +285,27 @@ mode -- ~ :: { AST.Mode }
 
 -- parses a sequence of variable declarations
 vars -- ~ :: { [AST.Var] }
-  : vars_ { $$ = reverse $1 }
+  : vars_ 
+    { $$ = reverse $1 
+    ; $1.symtab = $$.symtab
+    }
 -- parses a sequence of variable declarations
 -- WARNING: output in reverse
 vars_ -- ~ :: { [AST.Var] }
   : {- empty -} { $$ = [] }
-  | vars_ var   { $$ = $2:$1 }
+  | vars_ var   
+    { $$ = $2:$1 
+    ; $1.symtab = $$.symtab
+    ; $2.symtab = $$.symtab
+    }
 
 -- parses a variable declaration
 var -- ~ :: { AST.Var }
-  : typename idents ';' { $$ = AST.Var $1 $2 }
+  : typename idents ';' 
+    { $$ = AST.Var $1 $2 
+    ; $1.symtab = $$.symtab
+    ; $1.posn = fst $3
+    }
 
 -- parses a (non-empty) sequence of identifiers
 idents -- ~ :: { [AST.Ident] }
@@ -720,7 +761,8 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
     check (AST.IfElse _ ts fs) = checkAll $ ts ++ fs
     check (AST.While _ ss)     = checkAll ss 
     check (AST.Call p args)    = unless (checkCall p args)
-                                        (Left "bad call")
+                                        (Left $ "bad call to `" ++ p
+                                             ++ "` in `" ++ ident ++ "`")
     check _                    = return () 
     checkCall :: AST.Ident -> [AST.Expr] -> Bool
     checkCall proc args = ST.isTableKey proc procs 
@@ -729,10 +771,8 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
       where 
         callParams = map snd . ST.unParams . fromJust $ lookup proc procs
         validArg :: ST.Param -> AST.Expr -> Bool
-        validArg (ST.Param t m _) a =
-          let tType = ST.getType st t in
-            AST.getExprType a == ST.getType st t
-            && (AST.isLVal a || m == AST.Val)
+        validArg (ST.Param t m _) a = AST.getExprType a == ST.getType st t
+                                      && (AST.isLVal a || m == AST.Val)
                
 
 -- entryRecord

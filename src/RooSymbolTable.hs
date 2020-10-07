@@ -70,14 +70,14 @@ isRef (SymbolTable _ _ ((_,Procedure ps _ _):_)) alias
   = (AST.Ref ==) . unMode . M.fromJust $ lookup alias ps
 isRef _ _ = False
 
-getRecord :: SymbolTable -> AST.Ident -> Record
-getRecord (SymbolTable rs _ _) alias = M.fromJust $ lookup alias rs
+getRecord :: SymbolTable -> AST.Ident -> Maybe Record
+getRecord (SymbolTable rs _ _) alias = lookup alias rs
 
-getField :: Record -> AST.Ident -> Field
-getField (Record fs) field = M.fromJust $ lookup field fs
+getField :: Record -> AST.Ident -> Maybe Field
+getField (Record fs) field = lookup field fs
 
-getArray :: SymbolTable -> AST.Ident -> Array
-getArray (SymbolTable _ as _) alias = M.fromJust $ lookup alias as
+getArray :: SymbolTable -> AST.Ident -> Maybe Array
+getArray (SymbolTable _ as _) alias = lookup alias as
 
 getLocalOffset :: SymbolTable -> AST.Ident -> Maybe Int
 getLocalOffset (SymbolTable _ _ ((_,Procedure ps vs _):_)) alias
@@ -161,9 +161,9 @@ getLValType _ _ = AST.ErrorT
 lookupSize :: SymbolTable -> AST.TypeName -> Int
 lookupSize st@(SymbolTable rs _ _) (AST.Alias alias)
   | isTableKey alias rs
-    = length . unFields $ getRecord st alias
+    = length . unFields . M.fromJust $ getRecord st alias
 lookupSize st@(SymbolTable _ as _) (AST.Alias alias)
   | isTableKey alias as
     = s * lookupSize st t
-  where (Array t s) = getArray st alias
+  where (Array t s) = M.fromJust $ getArray st alias
 lookupSize _ _ = 1

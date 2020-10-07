@@ -7,7 +7,6 @@ import OzCode
 import Control.Monad.State
 import Control.Monad.Except
 import Data.List (intercalate)
-import Data.Maybe
 
 -- Gen
 -- Data type for a generator
@@ -234,8 +233,12 @@ genLValue st (AST.LField alias field) =
   do 
     aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
                $ ST.getLocalOffset st alias
-    let AST.RecordT rAlias = ST.getProcType st alias
-    let fOffset = ST.unFOffset $ ST.getField (ST.getRecord st rAlias) field
+    rAlias <- liftEither . getRecord $ ST.getProcType st alias
+    record <- maybeErr ("Unknown record type `" ++ rAlias ++ "`")
+              $ ST.getRecord st rAlias
+    fOffset <- maybeErr ("Unknown field `" ++ field 
+                         ++ "` of `" ++ rAlias ++"`")
+               $ ST.unFOffset <$> ST.getField record field
     r <- nextRegister
     if ST.isRef st alias 
     then let r' = r + 1 in
@@ -244,6 +247,11 @@ genLValue st (AST.LField alias field) =
                   , Oz_sub_offset r r r'
                   ]
     else return $ [ Oz_load_address r (aOffset - fOffset) ]
+  where 
+    getRecord (AST.RecordT rAlias) 
+      = Right rAlias
+    getRecord _                    
+      = Left $ "Incorrect type for `" ++ alias ++ "`" 
 genLValue st (AST.LInd alias e) =
   do 
     offset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
@@ -263,8 +271,12 @@ genLValue st (AST.LIndField alias e field) =
   do 
     aOffset <- maybeErr ("Unknown parameter/variable `" ++ alias ++ "`")
                $ ST.getLocalOffset st alias
-    let AST.ArrayT aAlias (AST.RecordT rAlias) = ST.getProcType st alias
-    let fOffset = ST.unFOffset $ ST.getField (ST.getRecord st rAlias) field
+    (aAlias, rAlias) <- liftEither . getArrayRecord $ ST.getProcType st alias
+    record <- maybeErr ("Unknown record type `" ++ rAlias ++ "`")
+              $ ST.getRecord st rAlias
+    fOffset <- maybeErr ("Unknown field `" ++ field 
+                         ++ "` of `" ++ rAlias ++"`")
+               $ ST.unFOffset <$> ST.getField record field
     let size = ST.lookupSize st $ AST.Alias aAlias
     r <- getRegister
     eCode <- genExpr st e
@@ -277,6 +289,11 @@ genLValue st (AST.LIndField alias e field) =
              , Oz_int_const r' fOffset
              , Oz_sub_offset r r r'
              ]
+  where 
+    getArrayRecord (AST.ArrayT aAlias (AST.RecordT rAlias)) 
+      = Right (aAlias, rAlias)
+    getArrayRecord _                    
+      = Left $ "Incorrect type for `" ++ alias ++ "`" 
     
 -- genExpr
 -- Generates a [OzCode] for a given AST.Expr
@@ -320,11 +337,5 @@ genExpr st (AST.UnOpExpr _ op a) =
           ++ [ getUnOpCode op r r ]
 
 genParam :: ST.SymbolTable -> ST.Param -> AST.Expr -> GenState [OzCode]
-genParam st (ST.Param _ AST.Ref _) (AST.LVal _ lval) =
-  do 
-    lCode <- genLValue st lval
-    return $ lCode 
-genParam st _ e =
-  do 
-    eCode <- genExpr st e
-    return $ eCode
+genParam st (ST.Param _ AST.Ref _) (AST.LVal _ lval) = genLValue st lval
+genParam st _                      e                 = genExpr st e

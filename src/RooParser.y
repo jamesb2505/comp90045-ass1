@@ -7,11 +7,9 @@ import qualified RooSymbolTable as ST
 import qualified RooLexer as L
 import qualified RooAST as AST
 
-import qualified Data.Containers.ListUtils as LU
-import Control.Monad
-import Data.Maybe
-
-import Debug.Trace
+import Data.Containers.ListUtils (nubOrd)
+import Control.Monad (unless)
+import Data.Maybe (fromJust)
 }
 
 %name runHappy program
@@ -19,7 +17,11 @@ import Debug.Trace
 %monad { Either String }
 %error { parseError }
 
-%attributetype { AttrTable a }
+-- Attr
+-- Attributes used in the Happy attributre grammar
+-- Attributes are both inherited and synthesised, based on the context
+-- of the parsing
+%attributetype { Attribute a }
 %attribute value   { a }
 %attribute records { ST.Table ST.Record }
 %attribute arrays  { ST.Table ST.Array }
@@ -131,7 +133,7 @@ records_ -- ~ :: { [AST.Record] }
 rec -- ~ :: { AST.Record }
   : record '{' fields '}' ident ';' 
     { $$ = AST.Record $3 $5
-    ; $$.records = [ entryRecord $$ ]
+    ; $$.records = [ ST.entryRecord $$ ]
     ; where unless (noDuplicates (map (\(AST.Field _ i) -> i) $3 ))
                    (Left $ "duplicate field name in record `" ++ $5 ++ "`")
     }
@@ -183,7 +185,7 @@ arrays_ -- ~ :: { [AST.Array] }
 arr -- ~ :: { AST.Array }
   : array '[' number ']' typename ident ';' 
     { $$ = AST.Array $3 $5 $6
-    ; $$.arrays = [ entryArray $$ ]
+    ; $$.arrays = [ ST.entryArray $$ ]
     ; $5.symtab = ST.SymbolTable $$.records [] []
     ; $5.posn = fst $4
     }
@@ -210,7 +212,8 @@ procedures -- ~ :: { [AST.Procedure] }
 procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
     { $$ = [$1]
-    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
+    ; $$.procs = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) 
+                                     $1 ]
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
     }
@@ -229,7 +232,8 @@ procedures_ -- ~ :: { [AST.Procedure] }
 proc -- ~ :: { AST.Procedure }
   : procedure ident '(' params ')' vars '{' stmts '}' 
     { $$ = AST.Procedure $2 $4 $6 $8 
-    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
+    ; $$.procs = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) 
+                                     $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
     ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
@@ -246,7 +250,7 @@ proc -- ~ :: { AST.Procedure }
 
 -- parses a sequence of parameter declarations
 params -- ~ :: { [AST.Param] }
-  : {- empty -}       { $$ = [] }
+  : {- empty -} { $$ = [] }
   | params_           
     { $$ = reverse $1
     ; $1.symtab = $$.symtab
@@ -450,7 +454,8 @@ lval -- ~ :: { AST.LValue }
                    (Left $ fmtPos (fst $2) 
                         ++ ": unknown array alias `" ++ $1 ++ "`")
     ; where unless ((not . AST.isArrayT $ ST.getProcType $$.symtab $1)
-                    || (AST.isRecordT . ST.getArrayType $ ST.getProcType $$.symtab $1))
+                    || (AST.isRecordT . ST.getArrayType 
+                        $ ST.getProcType $$.symtab $1))
                    (Left $ fmtPos (fst $2) 
                         ++ ": unknown array of records `" ++ $1 ++ "`")
     ; where unless (AST.isIntT $3.etype)
@@ -729,12 +734,12 @@ checkDuplicate key keys msg =
 -- fail with msg if duplicate is found
 checkDuplicates :: (Ord a) => [a] -> String -> Either String ()
 checkDuplicates xs msg = 
- unless (length (LU.nubOrd xs) == length xs) (Left msg)
+ unless (length (nubOrd xs) == length xs) (Left msg)
  
 -- noDuplicates
 -- Checks if a list contains no duplicate elements
 noDuplicates :: (Ord a) => [a] -> Bool
-noDuplicates xs = length (LU.nubOrd xs) == length xs 
+noDuplicates xs = length (nubOrd xs) == length xs 
 
 -- checkAllCalls
 -- Checks if all `call` statements in a Program are correct
@@ -773,89 +778,22 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
         validArg :: ST.Param -> AST.Expr -> Bool
         validArg (ST.Param t m _) a = AST.getExprType a == ST.getType st t
                                       && (AST.isLVal a || m == AST.Val)
-               
-
--- entryRecord
--- Converts a AST.Record into a [ST.Entry ST.Record]
-entryRecord :: AST.Record -> ST.Entry ST.Record
-entryRecord (AST.Record fs ident) = (ident, ST.Record $ entryFields fs)
-
--- entryFields
--- Converts a [AST.Field] into a [ST.Entry ST.Field]
-entryFields :: [AST.Field] -> [ST.Entry ST.Field]
-entryFields fs = zipWith entryField fs [0..] 
-
--- entryFields
--- Converts an AST.Field into an ST.Entry ST.Field
-entryField :: AST.Field -> Int -> ST.Entry ST.Field
-entryField (AST.Field t ident) offset = (ident, ST.Field t offset)
-
--- entryArray
--- Converts an AST.Array into an ST.Entry ST.Array
-entryArray :: AST.Array -> ST.Entry ST.Array
-entryArray (AST.Array size t ident) = (ident, ST.Array t (fromInteger size))
-
--- entryProcedure
--- Converts an AST.Procedure into an ST.Entry ST.Procedure with 
--- a ST.SymbolTable
-entryProcedure :: ST.SymbolTable -> AST.Procedure -> ST.Entry ST.Procedure
-entryProcedure st (AST.Procedure ident params vars _) =
-  (ident, ST.Procedure (entryParams params) fixedOffsetVars stackSize)
-  where 
-    vars' :: [ST.Entry ST.Var]
-    vars' = entryVars vars
-    fixedOffsetVars :: [ST.Entry ST.Var]
-    fixedOffsetVars = zipWith fixOffset vars' offsets
-      where fixOffset (ident, v) off = (ident, v { ST.unVOffset = off })
-    offsets :: [Int]
-    offsets = scanl (+) (length params)
-              $ map (ST.lookupSize st . ST.unVType . snd) vars'
-    stackSize :: Int
-    stackSize = last offsets
-
--- entryParams
--- Converts a [AST.Param] into a [ST.Entry ST.Param]
-entryParams :: [AST.Param] -> [ST.Entry ST.Param]
-entryParams params = zipWith entryParam params [0..]
-
--- entryParam
--- Converts an AST.Param into an ST.Entry ST.Param
-entryParam :: AST.Param -> Int -> ST.Entry ST.Param
-entryParam (AST.ParamAlias t ident) offset = 
-  (ident, ST.Param (AST.Alias t) AST.Ref offset)
-entryParam (AST.ParamAtomic t m ident) offset = 
-  (ident, ST.Param (AST.Atomic t) m offset)
-
--- entryVars
--- Converts a [AST.Var] into a [ST.Entry ST.Var]
-entryVars :: [AST.Var] -> [ST.Entry ST.Var]
-entryVars vars = concatMap entryVar vars
-
--- entryVar
--- Converts an AST.Var into an ST.Entry ST.Var
--- ST.unVOffset is erroneous in output
-entryVar :: AST.Var -> [ST.Entry ST.Var]
-entryVar (AST.Var t is) = map (\i -> (i, ST.Var t (-1))) is
 
 -- checkAssignRef
 -- Checks that an assignment is valid given the types
 checkAssignRef :: ST.SymbolTable -> AST.LValue -> AST.Expr 
                                  -> AST.ExprType -> AST.ExprType -> Bool
-checkAssignRef st lval e lType rType
-  = lType == rType
+checkAssignRef st@(ST.SymbolTable _ _ ps) lval e lType rType
+  = lType == rType && not (null ps) 
     && (AST.isArrayT lType || AST.isRecordT lType) 
-    && not (null procs) && ST.isTableKey rId params
-    && AST.isLVal e && AST.isLId lval
-    && (AST.isLId rval || AST.isLInd rval)
-    && lMode == rMode && lMode == AST.Ref
+    && ST.isTableKey rId params && ST.isTableKey lId params
+    && AST.isLVal e && lMode == rMode && lMode == AST.Ref
   where 
-    procs = ST.unProcedures st
-    params = ST.unParams . snd $ head procs
+    params = ST.unParams . snd $ head ps
     rval = fromJust $ AST.getLVal e
     rId = AST.getLId rval
     lId = AST.getLId lval
     getMode v = ST.unMode . fromJust $ lookup v params 
     rMode = getMode rId
     lMode = getMode lId
-
 }

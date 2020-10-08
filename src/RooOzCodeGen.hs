@@ -4,8 +4,8 @@ import qualified RooAST as AST
 import qualified RooSymbolTable as ST
 import OzCode
 
-import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.State (State, evalState, put, get)
+import Control.Monad.Except (ExceptT, runExceptT, liftEither, liftM, lift)
 import Data.List (intercalate)
 
 -- Gen
@@ -59,16 +59,16 @@ maybeErr :: String -> Maybe a -> GenState a
 maybeErr a Nothing  = liftEither $ Left a
 maybeErr _ (Just b) = liftEither $ Right b
 
--- initGenState
--- Initial State for a generator
-initGenState :: Gen
-initGenState = Gen 0 0
+-- initGen
+-- Initial Gen for a generator
+initGen :: Gen
+initGen = Gen 0 0
 
 -- runCodeGen
 -- Generates a list of OzCode of a given AST.Program
 -- Right on success, Left on error
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen prog st = evalState (runExceptT $ genProgram st prog) initGenState
+runCodeGen prog st = evalState (runExceptT $ genProgram st prog) initGen
 
 -- repeatGen
 -- Repeats a generator over a list, concatenating the results
@@ -91,41 +91,80 @@ genProgram st (AST.Program _ _ ps) =
 genProcedure :: ST.SymbolTable -> AST.Procedure -> GenState [OzCode]
 genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) = 
   do 
-    proc@(ST.Procedure params vars stackSize) 
+    proc@(ST.Procedure params _ stackSize) 
       <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
                   $ lookup name ps
     let nParams = length params
     let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
-    stmts <- repeatGen (genStmt $ st { ST.unProcedures = (name, proc):ps }) ss
-    if stackSize > 0
-    then return $ Oz_label (ProcLabel name)
-                : Oz_push_stack_frame stackSize
-                : pCode
-              ++ (if stackSize > nParams then [Oz_int_const 0 0] else [])
-              ++ [ Oz_store (i + nParams) 0 | i <- [0..stackSize - nParams - 1] ]
-              ++ stmts 
-              ++ [ Oz_pop_stack_frame stackSize
-                 , Oz_return
-                 ]
-    else return $ Oz_label (ProcLabel name) 
-                : pCode
-              ++ stmts 
-              ++ [ Oz_return ]
+    -- ensure current procedure is on the top of the SymbolTable
+    stmts <- repeatGen (genStmt st { ST.unProcedures = (name, proc):ps }) ss
+    return $ if stackSize > 0
+            then Oz_label (ProcLabel name)
+                 : Oz_push_stack_frame stackSize
+                 : pCode
+                ++ (if stackSize > nParams 
+                    then [Oz_int_const 0 0]
+                      ++ [ Oz_store (i + nParams) 0 
+                         | i <- [0..stackSize - nParams - 1] 
+                         ]
+                    else [])
+                ++ stmts 
+                ++ [ Oz_pop_stack_frame stackSize
+                   , Oz_return
+                   ]
+            else Oz_label (ProcLabel name) 
+                 : pCode
+                ++ stmts 
+                ++ [ Oz_return ]
 
 -- genStmt
 -- Generates a [OzCode] for a given AST.Stmt
 -- It is assumed that the current procedure is at the top of the 
 -- procedures of the ST.SymbolTable
 genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
-genStmt st (AST.Assign (AST.LId lAlias) (AST.LVal _ (AST.LId rAlias)))
+genStmt st (AST.Assign lval (AST.LVal _ rval))
   | ST.isRef st lAlias && ST.isRef st rAlias
   = do 
       lOffset <- getOffset lAlias
       rOffset <- getOffset rAlias
-      return $ [ Oz_load 0 rOffset
-               , Oz_store lOffset 0
-               ]
+      putRegister 0
+      lCode <- genLValue st lval
+      putRegister 1
+      rCode <- genLValue st rval
+      let size = ST.lookupTotalSize st . AST.getTypeName 
+                 $ ST.getLValueType st rval
+      let naive = concat [ [ Oz_int_const 2 i
+                           , Oz_sub_offset 3 1 2
+                           , Oz_sub_offset 2 0 2
+                           , Oz_load_indirect 3 3
+                           , Oz_store_indirect 2 3
+                           ] 
+                         | i <- [0..size - 1]
+                         ]
+      startLabel <- nextLabel
+      endLabel <- nextLabel
+      let looped = [ Oz_int_const 2 0
+                   , Oz_int_const 3 size
+                   , Oz_int_const 4 1
+                   , Oz_label startLabel
+                   , Oz_cmp_lt_int 5 2 3
+                   , Oz_branch_on_false 5 endLabel -- while r2 < r3 (= size)
+                   , Oz_sub_offset 6 1 2 
+                   , Oz_sub_offset 5 0 2
+                   , Oz_load_indirect 6 6
+                   , Oz_store_indirect 5 6         -- lval + r2 <- rval + r2
+                   , Oz_add_int 2 2 4              -- r2 <- r2 + r4 (= 1)
+                   , Oz_branch_uncond startLabel
+                   , Oz_label endLabel
+                   ]
+      return $ lCode
+            ++ rCode 
+            ++ if length naive <= length looped -- choose shortest option
+               then naive
+               else looped
   where 
+    lAlias = AST.getLId lval
+    rAlias = AST.getLId rval
     getOffset alias 
       = getLocalOffsetErr st alias ("Unknown variable `" ++ alias ++ "`")
 genStmt st (AST.Assign l e) =
@@ -141,7 +180,7 @@ genStmt st (AST.Read l) =
   do 
     putRegister 1
     lCode <- genLValue st l
-    reader <- liftEither . getReadBuiltin $ ST.getLValType st l
+    reader <- liftEither . getReadBuiltin $ ST.getLValueType st l
     return $ Oz_call_builtin reader
            : lCode
           ++ [ Oz_store_indirect 1 0 ]
@@ -209,11 +248,12 @@ genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
     pCode <- repeatGen genParam' $ zip3 [0..] (map snd paramTable) args 
     return $ pCode
           ++ [ Oz_call $ ProcLabel name ]
-  where genParam' (i, p, a) = putRegister i >> genParam st p a
+  where genParam' (r, p, a) = genParam st r p a
            
-
 -- genStmts
 -- Generates a [OzCode] for a given [AST.Program]
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
 genStmts :: ST.SymbolTable -> [AST.Stmt] -> GenState [OzCode]
 genStmts st ss = repeatGen (genStmt st) ss
 
@@ -225,7 +265,7 @@ genLValue :: ST.SymbolTable -> AST.LValue -> GenState [OzCode]
 genLValue st (AST.LId alias) = 
   do 
     offset <- getLocalOffsetErr st alias 
-               ("Unknown parameter/variable `" ++ alias ++ "`")
+                ("Unknown parameter/variable `" ++ alias ++ "`")
     r <- nextRegister
     if ST.isRef st alias 
     then return $ [ Oz_load r offset ]
@@ -241,63 +281,61 @@ genLValue st (AST.LField alias field) =
                          ++ "` of `" ++ rAlias ++"`")
                $ ST.unFOffset <$> ST.getField record field
     r <- nextRegister
-    if ST.isRef st alias 
-    then let r' = r + 1 in
-         return $ [ Oz_load r aOffset
+    return $ if ST.isRef st alias 
+             then let r' = r + 1 in
+                  [ Oz_load r aOffset
                   , Oz_int_const r' fOffset
                   , Oz_sub_offset r r r'
                   ]
-    else return $ [ Oz_load_address r $ aOffset + fOffset ]
+             else [ Oz_load_address r $ aOffset + fOffset ]
   where 
     getRecord (AST.RecordT rAlias) 
       = Right rAlias
     getRecord _                    
       = Left $ "Incorrect type for `" ++ alias ++ "`" 
-genLValue st@(ST.SymbolTable _ as _) (AST.LInd alias e) =
+genLValue st (AST.LInd alias e) =
   do 
     offset <- getLocalOffsetErr st alias 
-               ("Unknown parameter/variable `" ++ alias ++ "`")
+                ("Unknown parameter/variable `" ++ alias ++ "`")
     let AST.ArrayT aAlias size = ST.getProcType st alias
-    size <- maybeErr ("Uknown array type `" ++ aAlias ++ "`")
-            $ div (ST.lookupSize st $ AST.Alias aAlias)
-              <$> ST.unSize <$> lookup aAlias as
+    let size = ST.lookupElementSize st $ AST.Alias aAlias
     r <- getRegister
     eCode <- genExpr st e
     let r' = r + 1
     return $ eCode
-          ++ [ Oz_int_const r' $ size
+          ++ [ Oz_int_const r' size
              , Oz_mul_int r r' r
-             , Oz_load_address r' offset
+             , (if ST.isRef st alias 
+                then Oz_load else Oz_load_address) r' offset
              , Oz_sub_offset r r' r
              ]
-genLValue st@(ST.SymbolTable _ as _) (AST.LIndField alias e field) =
+genLValue st (AST.LIndField alias e field) =
   do 
     aOffset <- getLocalOffsetErr st alias 
                  ("Unknown parameter/variable `" ++ alias ++ "`")
-    (aAlias, rAlias) <- liftEither . getArrayRecord $ ST.getProcType st alias
+    (aAlias, rAlias) <- liftEither . getAliases $ ST.getProcType st alias
     record <- maybeErr ("Unknown record type `" ++ rAlias ++ "`")
               $ ST.getRecord st rAlias
     fOffset <- maybeErr ("Unknown field `" ++ field 
                          ++ "` of `" ++ rAlias ++"`")
                $ ST.unFOffset <$> ST.getField record field
-    size <- maybeErr ("Uknown array type `" ++ aAlias ++ "`")
-            $ div (ST.lookupSize st $ AST.Alias aAlias)
-              <$> ST.unSize <$> lookup aAlias as
+    let size = ST.lookupElementSize st $ AST.Alias aAlias
     r <- getRegister
     eCode <- genExpr st e
     let r' = r + 1
     return $ eCode
-          ++ [ Oz_int_const r' $ size
+          ++ [ Oz_int_const r' size
              , Oz_mul_int r r' r
-             , Oz_load_address r' aOffset
+             , (if ST.isRef st alias 
+                then Oz_load else Oz_load_address) r' aOffset
              , Oz_sub_offset r r' r
              , Oz_int_const r' fOffset
              , Oz_sub_offset r r r'
              ]
   where 
-    getArrayRecord (AST.ArrayT aAlias (AST.RecordT rAlias)) 
+    getAliases (AST.ArrayT aAlias (AST.RecordT rAlias)) 
       = Right (aAlias, rAlias)
-    getArrayRecord _                    
+    getAliases _                    
       = Left $ "Incorrect type for `" ++ alias ++ "`" 
     
 -- genExpr
@@ -341,10 +379,20 @@ genExpr st (AST.UnOpExpr _ op a) =
     return $ aCode
           ++ [ getUnOpCode op r r ]
 
-genParam :: ST.SymbolTable -> ST.Param -> AST.Expr -> GenState [OzCode]
-genParam st (ST.Param _ AST.Ref _) (AST.LVal _ lval) = genLValue st lval
-genParam st _                      e                 = genExpr st e
+-- genParam
+-- Generates a [OzCode] for a given ST.Param and AST.Expr at a given RegNum
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
+genParam :: ST.SymbolTable -> RegNum -> ST.Param -> AST.Expr 
+         -> GenState [OzCode]
+genParam st r (ST.Param _ AST.Ref _) (AST.LVal _ lval)
+ = putRegister r >> genLValue st lval
+genParam st r _ e 
+ = putRegister r >> genExpr st e
 
-
+-- getLocalOffsetErr
+-- Gets the local offset of an AST.Ident (variabl/parameter)
+-- It is assumed that the current procedure is at the top of the 
+-- procedures of the ST.SymbolTable
 getLocalOffsetErr :: ST.SymbolTable -> AST.Ident -> String -> GenState Int
 getLocalOffsetErr st alias err = maybeErr err $ ST.getLocalOffset st alias

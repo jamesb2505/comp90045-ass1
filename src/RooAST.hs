@@ -105,6 +105,7 @@ data Expr
 
 -- ExprType
 -- Represents the type of an expresion
+-- This is inferred by the expression and it's arguement's types
 data ExprType
   = BoolT
   | IntT
@@ -179,16 +180,6 @@ isLVal :: Expr -> Bool
 isLVal (LVal _ _) = True
 isLVal _          = False
 
--- isLId
--- True if LValue is an LId, else False
-isLId :: LValue -> Bool
-isLId (LId _) = True
-isLId _       = False
-
-isLInd :: LValue -> Bool
-isLInd (LInd _ _) = True
-isLInd _          = False
-
 -- getLId
 -- Gets the Ident of a given LValue
 getLId :: LValue -> Ident
@@ -258,3 +249,11 @@ isRecordT _           = False
 isArrayT :: ExprType -> Bool
 isArrayT (ArrayT _ _) = True
 isArrayT _            = False
+
+-- getTypeName
+-- Converts an ExprType into a TypeName
+getTypeName :: ExprType -> TypeName
+getTypeName (RecordT alias) = Alias alias
+getTypeName (ArrayT alias _) = Alias alias
+getTypeName BoolT = Atomic BoolType
+getTypeName IntT = Atomic IntType

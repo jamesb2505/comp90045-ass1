@@ -73,6 +73,7 @@ data OzCode
   | Oz_call_builtin String
   | Oz_return
   | Oz_halt
+  | Oz_comment String
   | Oz_debug_reg RegNum
   | Oz_debug_slot SlotNum
   | Oz_debug_stack
@@ -173,6 +174,8 @@ instance Show OzCode where
     = "\treturn"
   show (Oz_halt)                 
     = "halt"
+  show (Oz_comment s)                 
+    = "#" ++ intercalate "#" (lines s)
   show (Oz_debug_reg r)         
     = "\tdebug_reg " ++ fmtReg r
   show (Oz_debug_slot s)         
@@ -199,8 +202,9 @@ getBuiltinSuffix t         = Left $ "no builtin for " ++ show t
 getPrintBuiltin :: AST.ExprType -> Either String String
 getPrintBuiltin t = ("print_" ++) <$> getBuiltinSuffix t
 
-getReadBuiltin :: AST.ExprType -> Either String  String
-getReadBuiltin t = ("read_" ++) <$> getBuiltinSuffix t
+getReadBuiltin :: AST.ExprType -> Either String String
+getReadBuiltin t@AST.StrT = Left $ "no builtin for" ++ show t
+getReadBuiltin t          = ("read_" ++) <$> getBuiltinSuffix t
 
 getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
 getBinOpCode AST.Op_or  = Oz_or

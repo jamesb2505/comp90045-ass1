@@ -133,14 +133,18 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
       rCode <- genLValue st rval
       let size = ST.lookupTotalSize st . AST.getTypeName 
                  $ ST.getLValueType st rval
-      let naive = concat [ [ Oz_int_const 2 i
-                           , Oz_sub_offset 3 1 2
-                           , Oz_sub_offset 2 0 2
-                           , Oz_load_indirect 3 3
-                           , Oz_store_indirect 2 3
-                           ] 
-                         | i <- [0..size - 1]
-                         ]
+      let unrolled = Oz_load_indirect 0 2
+                   : Oz_store_indirect 1 2
+                   : (if size > 0
+                      then Oz_int_const 2 1
+                         : concat [ [ Oz_sub_offset 0 0 2 
+                                    , Oz_sub_offset 1 1 2
+                                    , Oz_load_indirect 3 0
+                                    , Oz_store_indirect 1 3
+                                    ] 
+                                  | i <- [1..size - 1]
+                                  ]
+                      else [])
       startLabel <- nextLabel
       endLabel <- nextLabel
       let looped = [ Oz_int_const 2 0
@@ -159,8 +163,8 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
                    ]
       return $ lCode
             ++ rCode 
-            ++ if length naive <= length looped -- choose shortest option
-               then naive
+            ++ if length unrolled <= length looped -- choose shortest option
+               then unrolled
                else looped
   where 
     lAlias = AST.getLId lval
@@ -245,10 +249,16 @@ genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
     proc@(ST.Procedure paramTable _ _) 
       <- maybeErr ("Unknown procedure `" ++ name ++ "`")
                   $ lookup name ps
-    pCode <- repeatGen genParam' $ zip3 [0..] (map snd paramTable) args 
+    pCode <- repeatGen (\(i,p,a) -> putRegister i >> genParam p a) 
+             $ zip3 [0..] (map snd paramTable) args 
     return $ pCode
           ++ [ Oz_call $ ProcLabel name ]
-  where genParam' (r, p, a) = genParam st r p a
+  where 
+    genParam :: ST.Param -> AST.Expr -> GenState [OzCode]
+    genParam (ST.Param _ AST.Ref _) (AST.LVal _ lval) 
+      = genLValue st lval
+    genParam _ e 
+      = genExpr st e
            
 -- genStmts
 -- Generates a [OzCode] for a given [AST.Program]
@@ -378,17 +388,6 @@ genExpr st (AST.UnOpExpr _ op a) =
     putRegister $ r + 1
     return $ aCode
           ++ [ getUnOpCode op r r ]
-
--- genParam
--- Generates a [OzCode] for a given ST.Param and AST.Expr at a given RegNum
--- It is assumed that the current procedure is at the top of the 
--- procedures of the ST.SymbolTable
-genParam :: ST.SymbolTable -> RegNum -> ST.Param -> AST.Expr 
-         -> GenState [OzCode]
-genParam st r (ST.Param _ AST.Ref _) (AST.LVal _ lval)
- = putRegister r >> genLValue st lval
-genParam st r _ e 
- = putRegister r >> genExpr st e
 
 -- getLocalOffsetErr
 -- Gets the local offset of an AST.Ident (variabl/parameter)

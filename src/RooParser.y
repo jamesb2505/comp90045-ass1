@@ -246,7 +246,8 @@ proc -- ~ :: { AST.Procedure }
     ; $4.posn = fst $3
     ; $$.posn = fst $1
     ; where let proc = snd $ head $$.procs in
-            checkDuplicates (map fst (ST.unParams proc) ++ map fst (ST.unVars proc))
+            checkDuplicates (map fst (ST.unParams proc) 
+                              ++ map fst (ST.unVars proc))
                             (fmtErr (fst $1)
                                $ "duplicate variable/parmeter in procedure "
                               ++ "definiton: `" ++ $2 ++ "`")
@@ -738,8 +739,7 @@ checkDuplicate key keys pos msg =
 -- Checks if keys contains no duplicates
 -- fail with err if duplicate is found
 checkDuplicates :: (Ord a) => [a] -> Either String () -> Either String ()
-checkDuplicates xs err = 
- unless (length (nubOrd xs) == length xs) err
+checkDuplicates xs err = unless (noDuplicates xs) err
  
 -- noDuplicates
 -- Checks if a list contains no duplicate elements

@@ -4,6 +4,7 @@ module RooLexer
   , Token(..)
   , AlexPosn(..)
   , Lexeme
+  , fmtPos
   ) where
 }
 
@@ -167,13 +168,18 @@ instance Show Token where
 
 type Lexeme = (AlexPosn, Token)
 
+-- fmtPos
+-- Formats an AlexPosn nicely
+fmtPos :: AlexPosn -> String
+fmtPos (AlexPn _ l c) = show l ++ ":" ++ show c 
+
 -- lexeme
 -- String -> Token, Lexeme builder
 lexeme :: (String -> Token) -> AlexPosn -> String -> Lexeme
 lexeme f p s = (p, f s)
 
 -- lexemeConst
--- Constant Token Builder
+-- Constant Lexeme Builder
 lexemeConst :: Token -> AlexPosn -> String -> Lexeme
 lexemeConst t = lexeme (const t)
 
@@ -188,13 +194,13 @@ runLexer str = go (alexStartPos,'\n',[],str)
       case alexScan inp 0 of
         AlexEOF 
           -> Right []
-        AlexError ((AlexPn _ l c),_,_,_) 
+        AlexError (p@(AlexPn _ l c),_,_,_) 
           -> let ls = lines str in
              let err = if c > 0 && l > 0 && l <= length ls
                        then "\n" ++ (ls !! (l - 1)) ++ "\n" 
                             ++ replicate (c - 1) ' ' ++ "^ here"
                        else ""
-             in Left $ show l ++ ":" ++ show c ++ ": lexical error" ++ err
+             in Left $ fmtPos p ++ ": lexical error" ++ err
         AlexSkip inp' len     
           -> go inp' 
         AlexToken inp' len act 

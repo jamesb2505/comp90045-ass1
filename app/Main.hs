@@ -65,7 +65,7 @@ doParse f filename = do
   input <- readFile filename
   case runLexer input >>= runParser of
     Left err         -> printErrorExit 2 err
-    Right (parsed,_) -> putStr $ f parsed
+    Right (parsed,_) -> putStrLn $ f parsed
 
 -- doCodeGen
 -- generates Oz code for a given filename

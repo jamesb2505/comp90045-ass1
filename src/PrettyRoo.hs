@@ -10,7 +10,7 @@ prettyPrint :: Program -> String
 prettyPrint (Program rs as ps) 
   = decs pRecord rs ++ decs pArray as
     ++ (if null rs && null as then "" else "\n")
-    ++ intercalate "\n" (map pProcedure ps)
+    ++ intercalate "\n\n" (map pProcedure ps)
   where
     decs _ [] = ""
     decs p ds = unlines $ map p ds
@@ -53,7 +53,7 @@ pExpr :: Expr -> String
 pExpr (LVal _ l)          = pLValue l
 pExpr (BoolConst _ b)     = if b then "true" else "false"
 pExpr (IntConst _ i)      = show i
-pExpr (StrConst _ s)      = "\"" ++ s ++ "\""
+pExpr (StrConst _ s)      = show s
 pExpr (UnOpExpr _ o e)    = pUnOp o ++ (if isParenExpr e && prec o > prec e
                                         then paren $ pExpr e
                                         else pExpr e)
@@ -107,7 +107,7 @@ pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 pProcedure :: Procedure -> String
 pProcedure (Procedure i ps vs ss) = "procedure " ++ i 
                                     ++ " (" ++ pParamComma ps ++")\n" 
-                                    ++ vars vs ++ "{\n" ++ pStmts ss ++ "}\n"
+                                    ++ vars vs ++ "{\n" ++ pStmts ss ++ "}"
   where 
     vars [] = []
     vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"

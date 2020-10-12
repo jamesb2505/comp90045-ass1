@@ -99,7 +99,7 @@ instance Show OzCode where
   show (Oz_real_const r d)      
     = "\treal_const " ++ intercalate ", " [ fmtReg r, show d ]
   show (Oz_string_const r s)    
-    = "\tstring_const " ++ fmtReg r ++ ", \"" ++ s ++ "\"" 
+    = "\tstring_const " ++ fmtReg r ++ ", " ++ show s
   show (Oz_add_int rI rJ rK)
     = "\tadd_int " ++ intercalate ", " (map fmtReg [ rI, rJ, rK ])
   show (Oz_add_real rI rJ rK)

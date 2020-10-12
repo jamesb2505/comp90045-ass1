@@ -719,7 +719,7 @@ runParser ls =
 -- Called when a error is found when parsing
 parseError :: [L.Lexeme] -> Either String a
 parseError []            = Left "EOF: Unexpected parse error"
-parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unxpected " ++ show t
+parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unexpected " ++ show t
 
 -- checkDuplicate
 -- Checks if a key is found in a list of keys

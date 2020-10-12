@@ -786,10 +786,10 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
 checkAssignRef :: ST.SymbolTable -> AST.LValue -> AST.Expr 
                                  -> AST.ExprType -> AST.ExprType -> Bool
 checkAssignRef st@(ST.SymbolTable _ _ ps) lval e lType rType
-  = lType == rType && not (null ps) 
+  = lType == rType && not (null ps) && AST.isLVal e 
     && (AST.isArrayT lType || AST.isRecordT lType) 
     && ST.isTableKey rId params && ST.isTableKey lId params
-    && AST.isLVal e && lMode == rMode && lMode == AST.Ref
+    && lMode == rMode && lMode == AST.Ref
   where 
     params = ST.unParams . snd $ head ps
     rval = fromJust $ AST.getLVal e

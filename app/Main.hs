@@ -23,6 +23,7 @@ import PrettyRoo (prettyPrint)
 
 import System.Environment (getArgs, getProgName)
 import System.Exit (ExitCode(..), exitWith)
+import System.IO (hPutStrLn, stderr)
 import Data.List (intercalate)
 
 data Task
@@ -63,8 +64,8 @@ doParse :: (Program -> String) -> String -> IO ()
 doParse f filename = do
   input <- readFile filename
   case runLexer input >>= runParser of
-    Left err          -> printErrorExit 2 err
-    Right (parsed, _) -> putStr $ f parsed
+    Left err         -> printErrorExit 2 err
+    Right (parsed,_) -> putStr $ f parsed
 
 -- doCodeGen
 -- generates Oz code for a given filename
@@ -72,10 +73,11 @@ doCodeGen :: String -> IO ()
 doCodeGen filename = do
   input <- readFile filename
   case runLexer input >>= runParser >>= uncurry runCodeGen of
-    Left err   -> printErrorExit 2 err
+    Left err    -> printErrorExit 2 err
     Right codes -> printOzCodes codes
 
 -- printErrorExit
 -- prints an error message and exits with failure exit code
 printErrorExit :: Int -> String -> IO a
-printErrorExit code s = putStrLn s >> exitWith (ExitFailure code)
+printErrorExit code s 
+  = hPutStrLn stderr ("ERROR:\n" ++ s) >> exitWith (ExitFailure code)

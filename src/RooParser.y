@@ -718,7 +718,7 @@ runParser ls =
 -- parseError
 -- Called when a error is found when parsing
 parseError :: [L.Lexeme] -> Either String a
-parseError []            = Left "EOF: Unxpected parse error"
+parseError []            = Left "EOF: Unexpected parse error"
 parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unxpected " ++ show t
 
 -- checkDuplicate

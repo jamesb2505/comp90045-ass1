@@ -68,7 +68,16 @@ initGen = Gen 0 0
 -- Generates a list of OzCode of a given AST.Program
 -- Right on success, Left on error
 runCodeGen :: AST.Program -> ST.SymbolTable -> Either String [OzCode]
-runCodeGen prog st = evalState (runExceptT $ genProgram st prog) initGen
+runCodeGen prog st = 
+  do
+    case evalState (runExceptT $ genProgram st prog) initGen of
+      l@(Left _) -> l
+      Right code -> return $ foldr (.) id optimisations code
+
+-- optimisations
+-- List of optimisations to perform to generated code
+optimisations :: [[OzCode] -> [OzCode]]
+optimisations = [peephole]
 
 -- repeatGen
 -- Repeats a generator over a list, concatenating the results
@@ -133,20 +142,22 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
       rCode <- genLValue st rval
       let size = ST.lookupTotalSize st . AST.getTypeName 
                  $ ST.getLValueType st rval
+      -- store from right to left manually
       let unrolled = Oz_load_indirect 0 2
                    : Oz_store_indirect 1 2
-                   : (if size > 0
-                      then Oz_int_const 2 1
-                         : concat [ [ Oz_sub_offset 0 0 2 
-                                    , Oz_sub_offset 1 1 2
-                                    , Oz_load_indirect 3 0
-                                    , Oz_store_indirect 1 3
-                                    ] 
-                                  | i <- [1..size - 1]
-                                  ]
-                      else [])
+                   : if size > 0
+                     then Oz_int_const 2 1
+                        : concat [ [ Oz_sub_offset 0 0 2 
+                                   , Oz_sub_offset 1 1 2
+                                   , Oz_load_indirect 3 0
+                                   , Oz_store_indirect 1 3
+                                   ] 
+                                 | i <- [1..size - 1]
+                                 ]
+                     else []
       startLabel <- nextLabel
       endLabel <- nextLabel
+      -- store from right to left via a loop
       let looped = [ Oz_int_const 2 0
                    , Oz_int_const 3 size
                    , Oz_int_const 4 1
@@ -210,8 +221,8 @@ genStmt st (AST.If e ss) =
     putRegister 0
     eCode <- genExpr st e
     ssCode <- genStmts st ss
-    return $ eCode
-          ++ [ Oz_branch_on_false 0 endLabel ]
+    return $ eCode                             -- store condition in r0
+          ++ [ Oz_branch_on_false 0 endLabel ] -- go to endLabel if false
           ++ ssCode
           ++ [ Oz_label endLabel ]
 genStmt st (AST.IfElse e ts fs) =
@@ -222,10 +233,10 @@ genStmt st (AST.IfElse e ts fs) =
     eCode <- genExpr st e
     tsCode <- genStmts st ts
     fsCode <- genStmts st fs
-    return $ eCode
-          ++ [ Oz_branch_on_false 0 falseLabel ]
+    return $ eCode                               -- store condition in r0
+          ++ [ Oz_branch_on_false 0 falseLabel ] -- go to falseLabel if false
           ++ tsCode
-          ++ [ Oz_branch_uncond endLabel
+          ++ [ Oz_branch_uncond endLabel         -- go to endLabel
              , Oz_label falseLabel 
              ]
           ++ fsCode
@@ -237,12 +248,12 @@ genStmt st (AST.While e ss) =
     putRegister 0
     eCode <- genExpr st e
     ssCode <- genStmts st ss
-    return $ Oz_label startLabel
-           : eCode
-          ++ [ Oz_branch_on_false 0 endLabel ]
-          ++ ssCode
-          ++ [ Oz_branch_uncond startLabel
-             , Oz_label endLabel
+    return $ Oz_label startLabel    
+           : eCode                             -- store condition in r0
+          ++ [ Oz_branch_on_false 0 endLabel ] -- go to endLabel if false
+          ++ ssCode                            -- do statements
+          ++ [ Oz_branch_uncond startLabel     -- go to startLabel
+             , Oz_label endLabel         
              ]
 genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
   do 
@@ -395,3 +406,15 @@ genExpr st (AST.UnOpExpr _ op a) =
 -- procedures of the ST.SymbolTable
 getLocalOffsetErr :: ST.SymbolTable -> AST.Ident -> String -> GenState Int
 getLocalOffsetErr st alias err = maybeErr err $ ST.getLocalOffset st alias
+
+-- peephole
+-- Performs peephole optimisation
+peephole :: [OzCode] -> [OzCode] 
+peephole code = reverse $ go [] code
+  where
+    go res (Oz_load_address rLoad slot:Oz_store_indirect rStore rVal:cs)
+      | rLoad == rStore = go (Oz_store slot rVal:res) cs
+    go res (Oz_load_address rLoad slot:Oz_load_indirect rInd rVal:cs)
+      | rLoad == rInd = go (Oz_load rVal slot:res) cs
+    go res (c:cs) = go (c:res) cs
+    go res [] = res

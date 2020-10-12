@@ -77,7 +77,7 @@ runCodeGen prog st =
 -- optimisations
 -- List of optimisations to perform to generated code
 optimisations :: [[OzCode] -> [OzCode]]
-optimisations = [peephole]
+optimisations = [peephole, coerceLabels]
 
 -- repeatGen
 -- Repeats a generator over a list, concatenating the results
@@ -103,28 +103,29 @@ genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
     proc@(ST.Procedure params _ stackSize) 
       <- maybeErr ("Unknown procedure `" ++ name ++ "`") 
                   $ lookup name ps
-    let nParams = length params
-    let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
     -- ensure current procedure is on the top of the SymbolTable
     stmts <- repeatGen (genStmt st { ST.unProcedures = (name, proc):ps }) ss
+    let nParams = length params
+    -- store parameters on the stack
+    let pCode = [ Oz_store i i | i <- [0..nParams - 1] ]
     return $ if stackSize > 0
-            then Oz_label (ProcLabel name)
-                 : Oz_push_stack_frame stackSize
-                 : pCode
-                ++ (if stackSize > nParams 
-                    then [Oz_int_const 0 0]
-                      ++ [ Oz_store (i + nParams) 0 
-                         | i <- [0..stackSize - nParams - 1] 
-                         ]
-                    else [])
-                ++ stmts 
-                ++ [ Oz_pop_stack_frame stackSize
-                   , Oz_return
-                   ]
-            else Oz_label (ProcLabel name) 
-                 : pCode
-                ++ stmts 
-                ++ [ Oz_return ]
+             then Oz_label (ProcLabel name)
+                  : Oz_push_stack_frame stackSize
+                  : pCode
+                 ++ (if stackSize > nParams -- initialise stack to 0
+                     then [Oz_int_const 0 0]
+                       ++ [ Oz_store (i + nParams) 0 
+                          | i <- [0..stackSize - nParams - 1] 
+                          ]
+                     else [])
+                 ++ stmts 
+                 ++ [ Oz_pop_stack_frame stackSize
+                    , Oz_return
+                    ]
+             else Oz_label (ProcLabel name) 
+                  : pCode
+                 ++ stmts 
+                 ++ [ Oz_return ]
 
 -- genStmt
 -- Generates a [OzCode] for a given AST.Stmt
@@ -188,30 +189,30 @@ genStmt st (AST.Assign l e) =
     eCode <- genExpr st e
     putRegister 1
     lCode <- genLValue st l
-    return $ eCode 
-          ++ lCode
+    return $ eCode                     -- store e in r0
+          ++ lCode                     -- store l in r1 (reference)
           ++ [ Oz_store_indirect 1 0 ]
 genStmt st (AST.Read l) =
   do 
     putRegister 1
     lCode <- genLValue st l
     reader <- liftEither . getReadBuiltin $ ST.getLValueType st l
-    return $ Oz_call_builtin reader
-           : lCode
+    return $ Oz_call_builtin reader    -- read into r0
+           : lCode                     -- store l in r1 (reference)
           ++ [ Oz_store_indirect 1 0 ]
 genStmt st (AST.Write e) =
   do 
     putRegister 0
     expr <- genExpr st e
     printer <- liftEither . getPrintBuiltin $ AST.getExprType e
-    return $ expr 
+    return $ expr                        -- store e in r0
           ++ [ Oz_call_builtin printer ]
 genStmt st (AST.Writeln e) =
   do 
     putRegister 0
     expr <- genExpr st e
     printer <- liftEither . getPrintBuiltin $ AST.getExprType e
-    return $ expr
+    return $ expr                              -- store e in r0
           ++ [ Oz_call_builtin printer 
              , Oz_call_builtin "print_newline"
              ]
@@ -262,7 +263,7 @@ genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
                   $ lookup name ps
     pCode <- repeatGen (\(i,p,a) -> putRegister i >> genParam p a) 
              $ zip3 [0..] (map snd paramTable) args 
-    return $ pCode
+    return $ pCode                        -- store parameters in r0..rn
           ++ [ Oz_call $ ProcLabel name ]
   where 
     genParam :: ST.Param -> AST.Expr -> GenState [OzCode]
@@ -288,9 +289,10 @@ genLValue st (AST.LId alias) =
     offset <- getLocalOffsetErr st alias 
                 ("Unknown parameter/variable `" ++ alias ++ "`")
     r <- nextRegister
-    if ST.isRef st alias 
-    then return $ [ Oz_load r offset ]
-    else return $ [ Oz_load_address r offset ]
+    return $ [ if ST.isRef st alias 
+               then Oz_load r offset         -- load stack slot (reference)
+               else Oz_load_address r offset -- load slot address
+             ] 
 genLValue st (AST.LField alias field) = 
   do 
     aOffset <- getLocalOffsetErr st alias 
@@ -304,8 +306,8 @@ genLValue st (AST.LField alias field) =
     r <- nextRegister
     return $ if ST.isRef st alias 
              then let r' = r + 1 in
-                  [ Oz_load r aOffset
-                  , Oz_int_const r' fOffset
+                  [ Oz_load r aOffset       -- load stack slot (reference)
+                  , Oz_int_const r' fOffset -- sub field offset
                   , Oz_sub_offset r r r'
                   ]
              else [ Oz_load_address r $ aOffset + fOffset ]
@@ -325,9 +327,10 @@ genLValue st (AST.LInd alias e) =
     let r' = r + 1
     return $ eCode
           ++ [ Oz_int_const r' size
-             , Oz_mul_int r r' r
-             , (if ST.isRef st alias 
-                then Oz_load else Oz_load_address) r' offset
+             , Oz_mul_int r r' r              -- r  = total offset = e * size 
+             , if ST.isRef st alias           -- r' = base address
+               then Oz_load r' offset
+               else Oz_load_address r' offset
              , Oz_sub_offset r r' r
              ]
 genLValue st (AST.LIndField alias e field) =
@@ -346,12 +349,13 @@ genLValue st (AST.LIndField alias e field) =
     let r' = r + 1
     return $ eCode
           ++ [ Oz_int_const r' size
-             , Oz_mul_int r r' r
-             , (if ST.isRef st alias 
-                then Oz_load else Oz_load_address) r' aOffset
-             , Oz_sub_offset r r' r
+             , Oz_mul_int r r' r               -- r = record offset = e * size
              , Oz_int_const r' fOffset
-             , Oz_sub_offset r r r'
+             , Oz_add_int r r r'               -- r = record offset + field 
+             , if ST.isRef st alias 
+               then Oz_load r' aOffset
+               else Oz_load_address r' aOffset -- r' = base address
+             , Oz_sub_offset r r' r
              ]
   where 
     getAliases (AST.ArrayT aAlias (AST.RecordT rAlias)) 
@@ -408,13 +412,36 @@ getLocalOffsetErr :: ST.SymbolTable -> AST.Ident -> String -> GenState Int
 getLocalOffsetErr st alias err = maybeErr err $ ST.getLocalOffset st alias
 
 -- peephole
--- Performs peephole optimisation
+-- Performs peephole optimisations
+--  * load address, store inderect -> store
+--  * load_address, load indirect  -> load
 peephole :: [OzCode] -> [OzCode] 
-peephole code = reverse $ go [] code
+peephole code = reverse $ peephole' [] code
   where
-    go res (Oz_load_address rLoad slot:Oz_store_indirect rStore rVal:cs)
-      | rLoad == rStore = go (Oz_store slot rVal:res) cs
-    go res (Oz_load_address rLoad slot:Oz_load_indirect rInd rVal:cs)
-      | rLoad == rInd = go (Oz_load rVal slot:res) cs
-    go res (c:cs) = go (c:res) cs
-    go res [] = res
+    peephole' res (Oz_load_address rLoad slot:Oz_store_indirect rStore rVal:cs)
+      | rLoad == rStore = peephole' (Oz_store slot rVal:res) cs
+    peephole' res (Oz_load_address rLoad slot:Oz_load_indirect rInd rVal:cs)
+      | rLoad == rInd = peephole' (Oz_load rVal slot:res) cs
+    peephole' res (c:cs) = peephole' (c:res) cs
+    peephole' res [] = res
+
+-- coerceLabels
+-- Coerces concurrent labels into one, as branches to either 
+-- label is equivalent
+coerceLabels :: [OzCode] -> [OzCode]
+coerceLabels code = coerceLabels' code code
+  where
+    coerceLabels' (aLabel@(Oz_label a):rest@(Oz_label b:cs)) toCoerce
+      = coerceLabels' rest (filter (/= aLabel) $ map coerce toCoerce)
+      where
+        coerce (Oz_branch_on_true r a')
+          | a == a' = Oz_branch_on_true r b
+        coerce (Oz_branch_on_false r a')
+          | a == a' = Oz_branch_on_false r b
+        coerce (Oz_branch_uncond a')
+          | a == a' = Oz_branch_uncond b
+        coerce (Oz_call a')
+          | a == a' = Oz_call b
+        coerce code = code
+    coerceLabels' (_:cs) coerced = coerceLabels' cs coerced
+    coerceLabels' [] coerced = coerced

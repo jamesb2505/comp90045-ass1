@@ -64,11 +64,11 @@ import Data.Maybe (fromJust)
   '.'        { (_, L.T_dot) }
   '<-'       { (_, L.T_assign) }
   '='        { (_, L.T_eq) }
-  '!='       { (_, L.T_neq) }
+  '!='       { (_, L.T_ne) }
   '<'        { (_, L.T_lt) }
-  '<='       { (_, L.T_leq) }
+  '<='       { (_, L.T_le) }
   '>'        { (_, L.T_gt) }
-  '>='       { (_, L.T_geq) }
+  '>='       { (_, L.T_ge) }
   '+'        { (_, L.T_add) }
   '-'        { (_, L.T_sub) }
   '*'        { (_, L.T_mul) }
@@ -543,7 +543,7 @@ expr -- ~ :: { AST.Expr }
                         ++ ": uncomparable types in " ++ show (snd $2))
     }
   | expr '!=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_neq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_ne $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
@@ -565,7 +565,7 @@ expr -- ~ :: { AST.Expr }
                         ++ ": uncomparable types in " ++ show (snd $2))
     }
   | expr '<=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_leq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_le $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
@@ -587,7 +587,7 @@ expr -- ~ :: { AST.Expr }
                         ++ ": uncomparable types in " ++ show (snd $2))
     }
   | expr '>=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_geq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_ge $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab

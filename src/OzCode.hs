@@ -210,11 +210,11 @@ getBinOpCode :: AST.BinOp -> (RegNum -> RegNum -> RegNum -> OzCode)
 getBinOpCode AST.Op_or  = Oz_or
 getBinOpCode AST.Op_and = Oz_and
 getBinOpCode AST.Op_eq  = Oz_cmp_eq_int
-getBinOpCode AST.Op_neq = Oz_cmp_ne_int
+getBinOpCode AST.Op_ne  = Oz_cmp_ne_int
 getBinOpCode AST.Op_lt  = Oz_cmp_lt_int
-getBinOpCode AST.Op_leq = Oz_cmp_le_int
+getBinOpCode AST.Op_le  = Oz_cmp_le_int
 getBinOpCode AST.Op_gt  = Oz_cmp_gt_int
-getBinOpCode AST.Op_geq = Oz_cmp_ge_int
+getBinOpCode AST.Op_ge  = Oz_cmp_ge_int
 getBinOpCode AST.Op_add = Oz_add_int
 getBinOpCode AST.Op_sub = Oz_sub_int
 getBinOpCode AST.Op_mul = Oz_mul_int

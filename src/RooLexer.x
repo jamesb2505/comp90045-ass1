@@ -52,11 +52,11 @@ rules :-
   \.        { lexemeConst T_dot }
   \<\-      { lexemeConst T_assign }
   \=        { lexemeConst T_eq }
-  \!\=      { lexemeConst T_neq }
+  \!\=      { lexemeConst T_ne }
   \<        { lexemeConst T_lt }
-  \<\=      { lexemeConst T_leq }
+  \<\=      { lexemeConst T_le }
   \>        { lexemeConst T_gt }
-  \>\=      { lexemeConst T_geq }
+  \>\=      { lexemeConst T_ge }
   \+        { lexemeConst T_add }
   \-        { lexemeConst T_sub }
   \*        { lexemeConst T_mul }
@@ -101,11 +101,11 @@ data Token
   | T_dot
   | T_assign
   | T_eq
-  | T_neq 
+  | T_ne 
   | T_lt
-  | T_leq
+  | T_le
   | T_gt
-  | T_geq
+  | T_ge
   | T_add
   | T_sub
   | T_mul
@@ -152,11 +152,11 @@ instance Show Token where
   show T_dot        = "`.`"
   show T_assign     = "`<-`"
   show T_eq         = "`=`"
-  show T_neq        = "`!=`" 
+  show T_ne        = "`!=`" 
   show T_lt         = "`<`"
-  show T_leq        = "`<=`"
+  show T_le        = "`<=`"
   show T_gt         = "`>`"
-  show T_geq        = "`>=`"
+  show T_ge        = "`>=`"
   show T_add        = "`+`"
   show T_sub        = "`-`"
   show T_mul        = "`*`"

@@ -121,11 +121,11 @@ data BinOp
   = Op_or
   | Op_and
   | Op_eq
-  | Op_neq
+  | Op_ne
   | Op_lt
-  | Op_leq
+  | Op_le
   | Op_gt
-  | Op_geq
+  | Op_ge
   | Op_add
   | Op_sub
   | Op_mul
@@ -165,14 +165,14 @@ instance Precedence Expr where
 -- isLAssoc, isRAssoc
 -- Gets the left or right associativity of a BinOp
 isLAssoc, isRAssoc :: BinOp -> Bool
-isLAssoc _      = True
-isRAssoc Op_eq  = True
-isRAssoc Op_neq = True
-isRAssoc Op_lt  = True
-isRAssoc Op_leq = True
-isRAssoc Op_gt  = True
-isRAssoc Op_geq = True
-isRAssoc _      = False
+isLAssoc _     = True
+isRAssoc Op_eq = True
+isRAssoc Op_ne = True
+isRAssoc Op_lt = True
+isRAssoc Op_le = True
+isRAssoc Op_gt = True
+isRAssoc Op_ge = True
+isRAssoc _     = False
 
 -- isLVal
 -- True if Expr is an LVal, else False

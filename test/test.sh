@@ -2,8 +2,8 @@
 make -f ./Makefile;
 printf "\n";
 
-CORRECT=0; TESTS=0
-for ROO in ./testdata/*.roo; do
+COMPILATIONS=0; CORRECT=0; TESTS=0
+for ROO in $(find ./testdata -name '*.roo'); do
     TESTS=$(($TESTS+1))
 
     echo "Compiling $ROO";
@@ -11,6 +11,8 @@ for ROO in ./testdata/*.roo; do
     then
         echo "Compilation failed.";
     else
+        COMPILATIONS=$(($COMPILATIONS+1))
+
         echo "Compilation successfull.";
 
         IN=$(echo $ROO | sed 's/.roo$/.in/')
@@ -46,4 +48,9 @@ done
 
 rm -f ./test/tmp.out ./test/tmp.oz
 
-printf "%.2f%% correct outputs\n" $((100 * $CORRECT / $TESTS))
+printf "%.2f%% successful compilations from %d attempts\n" \
+    $((100 * $COMPILATIONS / $TESTS)) \
+    $TESTS
+printf "%.2f%% correct outputs from %d tests\n" \
+    $((100 * $CORRECT / $TESTS)) \
+    $COMPILATIONS

@@ -5,6 +5,7 @@ printf "\n";
 CORRECT=0; TESTS=0
 for ROO in ./testdata/*.roo; do
     TESTS=$(($TESTS+1))
+
     echo "Compiling $ROO";
     if ! ./Roo $ROO > ./test/tmp.oz;
     then
@@ -12,7 +13,7 @@ for ROO in ./testdata/*.roo; do
     else
         echo "Compilation successfull.";
 
-        IN=${ROO//\.roo/\.in}
+        IN=$(echo $ROO | sed 's/.roo$/.in/')
         if [[ -e $IN ]] 
         then
             echo "Running with input $IN"
@@ -22,7 +23,7 @@ for ROO in ./testdata/*.roo; do
             ./oz/oz ./test/tmp.oz > ./test/tmp.out
         fi
 
-        OUT=${ROO//\.roo/\.out}
+        OUT=$(echo $ROO | sed 's/.roo$/.out/')
         if [[ -e $OUT ]] 
         then
             DIFF=$(diff $OUT ./test/tmp.out)
@@ -39,6 +40,7 @@ for ROO in ./testdata/*.roo; do
             cat ./test/tmp.out
         fi
     fi
+    
     printf "\n";
 done
 

@@ -19,7 +19,7 @@ $ ./Roo prog.roo > prog.oz
 $ ./oz/oz prog.oz
 ```
 
-# Other Features
+## Other Features
 * Pretty Print a Roo program
 
   ```sh

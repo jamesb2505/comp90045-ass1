@@ -105,6 +105,7 @@ data Expr
 
 -- ExprType
 -- Represents the type of an expresion
+-- This is inferred by the expression and it's arguement's types
 data ExprType
   = BoolT
   | IntT
@@ -120,11 +121,11 @@ data BinOp
   = Op_or
   | Op_and
   | Op_eq
-  | Op_neq
+  | Op_ne
   | Op_lt
-  | Op_leq
+  | Op_le
   | Op_gt
-  | Op_geq
+  | Op_ge
   | Op_add
   | Op_sub
   | Op_mul
@@ -164,30 +165,20 @@ instance Precedence Expr where
 -- isLAssoc, isRAssoc
 -- Gets the left or right associativity of a BinOp
 isLAssoc, isRAssoc :: BinOp -> Bool
-isLAssoc _      = True
-isRAssoc Op_eq  = True
-isRAssoc Op_neq = True
-isRAssoc Op_lt  = True
-isRAssoc Op_leq = True
-isRAssoc Op_gt  = True
-isRAssoc Op_geq = True
-isRAssoc _      = False
+isLAssoc _     = True
+isRAssoc Op_eq = True
+isRAssoc Op_ne = True
+isRAssoc Op_lt = True
+isRAssoc Op_le = True
+isRAssoc Op_gt = True
+isRAssoc Op_ge = True
+isRAssoc _     = False
 
 -- isLVal
 -- True if Expr is an LVal, else False
 isLVal :: Expr -> Bool
 isLVal (LVal _ _) = True
 isLVal _          = False
-
--- isLId
--- True if LValue is an LId, else False
-isLId :: LValue -> Bool
-isLId (LId _) = True
-isLId _       = False
-
-isLInd :: LValue -> Bool
-isLInd (LInd _ _) = True
-isLInd _          = False
 
 -- getLId
 -- Gets the Ident of a given LValue
@@ -258,3 +249,11 @@ isRecordT _           = False
 isArrayT :: ExprType -> Bool
 isArrayT (ArrayT _ _) = True
 isArrayT _            = False
+
+-- getTypeName
+-- Converts an ExprType into a TypeName
+getTypeName :: ExprType -> TypeName
+getTypeName (RecordT alias) = Alias alias
+getTypeName (ArrayT alias _) = Alias alias
+getTypeName BoolT = Atomic BoolType
+getTypeName IntT = Atomic IntType

@@ -7,9 +7,9 @@ import qualified RooSymbolTable as ST
 import qualified RooLexer as L
 import qualified RooAST as AST
 
-import qualified Data.Containers.ListUtils as LU
-import Control.Monad
-import Data.Maybe
+import Data.Containers.ListUtils (nubOrd)
+import Control.Monad (unless)
+import Data.Maybe (fromJust)
 }
 
 %name runHappy program
@@ -17,13 +17,18 @@ import Data.Maybe
 %monad { Either String }
 %error { parseError }
 
-%attributetype { AttrTable a }
+-- Attr
+-- Attributes used in the Happy attributre grammar
+-- Attributes are both inherited and synthesised, based on the context
+-- of the parsing
+%attributetype { Attribute a }
 %attribute value   { a }
 %attribute records { ST.Table ST.Record }
 %attribute arrays  { ST.Table ST.Array }
 %attribute procs   { ST.Table ST.Procedure }
 %attribute symtab  { ST.SymbolTable }
 %attribute etype   { AST.ExprType }
+%attribute posn    { L.AlexPosn }
 
 %token
   and        { (_, L.T_and) }
@@ -59,11 +64,11 @@ import Data.Maybe
   '.'        { (_, L.T_dot) }
   '<-'       { (_, L.T_assign) }
   '='        { (_, L.T_eq) }
-  '!='       { (_, L.T_neq) }
+  '!='       { (_, L.T_ne) }
   '<'        { (_, L.T_lt) }
-  '<='       { (_, L.T_leq) }
+  '<='       { (_, L.T_le) }
   '>'        { (_, L.T_gt) }
-  '>='       { (_, L.T_geq) }
+  '>='       { (_, L.T_ge) }
   '+'        { (_, L.T_add) }
   '-'        { (_, L.T_sub) }
   '*'        { (_, L.T_mul) }
@@ -121,16 +126,18 @@ records_ -- ~ :: { [AST.Record] }
     { $$ = $2:$1
     ; $$.records = $2.records ++ $1.records
     ; where checkDuplicate (fst $ head $2.records) (ST.tableKeys $ $1.records)
-                           "duplicate record alias"
+                           $2.posn "duplicate record alias"
     }
 
 -- parses a record declaration
 rec -- ~ :: { AST.Record }
   : record '{' fields '}' ident ';' 
     { $$ = AST.Record $3 $5
-    ; $$.records = [ entryRecord $$ ]
+    ; $$.records = [ ST.entryRecord $$ ]
+    ; $$.posn = fst $1
     ; where unless (noDuplicates (map (\(AST.Field _ i) -> i) $3 ))
-                   (Left $ "duplicate field name in record `" ++ $5 ++ "`")
+                   (fmtErr $$.posn 
+                      $ "duplicate field name in record `" ++ $5 ++ "`")
     }
 
 -- parses a non-empty sequence of record fields
@@ -171,22 +178,29 @@ arrays_ -- ~ :: { [AST.Array] }
     ; $2.records = $$.records 
     ; $$.arrays = $2.arrays ++ $1.arrays
     ; where checkDuplicate (fst $ head $2.arrays) (ST.tableKeys $1.arrays)
-                           "duplicate array alias"
+                           $2.posn "duplicate array alias"
     ; where checkDuplicate (fst $ head $2.arrays) (ST.tableKeys $$.records)
-                           "duplicate record/array alias"
+                           $2.posn "duplicate alias"
     }
 
 -- parses an array declarations
 arr -- ~ :: { AST.Array }
   : array '[' number ']' typename ident ';' 
     { $$ = AST.Array $3 $5 $6
-    ; $$.arrays = [ entryArray $$ ]
+    ; $$.arrays = [ ST.entryArray $$ ]
+    ; $5.symtab = ST.SymbolTable $$.records [] []
+    ; $5.posn = fst $4
+    ; $$.posn = fst $1
     }
 
 -- parses a typename (alias or atomic type)
 typename -- ~ :: { AST.TypeName }
   : basetype { $$ = AST.Atomic $1 }
-  | ident    { $$ = AST.Alias $1 }
+  | ident    
+    { $$ = AST.Alias $1 
+    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+                   (fmtErr $$.posn $ "unknown type `" ++ $1 ++ "`")
+    }
 
 -- parses a non-empty sequence of procedure definitions
 procedures -- ~ :: { [AST.Procedure] }
@@ -201,10 +215,10 @@ procedures -- ~ :: { [AST.Procedure] }
 procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
     { $$ = [$1]
-    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
+    ; $$.procs 
+        = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
     ; $1.records = $$.records
-    ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
-    ; $1.symtab = $$.symtab
+    ; $1.arrays = $$.arrays
     }
   | procedures_ proc 
     { $$ = $2:$1
@@ -213,39 +227,64 @@ procedures_ -- ~ :: { [AST.Procedure] }
     ; $1.arrays = $$.arrays
     ; $2.arrays = $$.arrays 
     ; $$.procs = $2.procs ++ $1.procs
-    ; $2.symtab = $1.symtab { ST.unProcedures = $2.procs }
     ; where checkDuplicate (fst $ head $2.procs) (ST.tableKeys $1.procs)
-                           "duplicate procedure name"
+                           $2.posn "duplicate procedure name"
     }
 
 -- parses a procedure definition
 proc -- ~ :: { AST.Procedure }
   : procedure ident '(' params ')' vars '{' stmts '}' 
     { $$ = AST.Procedure $2 $4 $6 $8 
-    ; $$.procs = [ entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
+    ; $$.procs 
+        = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
+    ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
+    ; $4.symtab = $$.symtab
+    ; $6.symtab = $$.symtab
     ; $8.symtab = $$.symtab
+    ; $4.posn = fst $3
+    ; $$.posn = fst $1
     ; where let proc = snd $ head $$.procs in
             checkDuplicates (map fst (ST.unParams proc) 
-                             ++ map fst (ST.unVars proc))
-                            ("duplicate variable/parmeter in procedure "
-                             ++ "definiton: `" ++ (fst $ head $$.procs) ++ "`")
+                              ++ map fst (ST.unVars proc))
+                            (fmtErr (fst $1)
+                               $ "duplicate variable/parmeter in procedure "
+                              ++ "definiton: `" ++ $2 ++ "`")
     }
 
 -- parses a sequence of parameter declarations
 params -- ~ :: { [AST.Param] }
-  : {- empty -}       { $$ = [] }
-  | params_           { $$ = reverse $1 }
+  : {- empty -} { $$ = [] }
+  | params_           
+    { $$ = reverse $1
+    ; $1.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    }
 -- parses a non-empty sequence of parameter declarations
 -- WARNING: output in reverse
 params_ -- ~ :: { [AST.Param] }
-  : param             { $$ = [$1] }
-  | params_ ',' param { $$ = $3:$1 }
+  : param             
+    { $$ = [$1]
+    ; $1.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    }
+  | params_ ',' param 
+    { $$ = $3:$1
+    ; $1.symtab = $$.symtab
+    ; $3.symtab = $$.symtab
+    ; $1.posn = $$.posn
+    ; $3.posn = $$.posn
+    }
 
 -- parses a parameter definition
 param -- ~ :: { AST.Param }
-  : ident ident         { $$ = AST.ParamAlias $1 $2 }
+  : ident ident         
+    { $$ = AST.ParamAlias $1 $2
+    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+                   (fmtErr $$.posn 
+                     $ "unknown type `" ++ $1 ++ "` for `" ++ $2 ++ "`")
+    }
   | basetype mode ident { $$ = AST.ParamAtomic $1 $2 $3 }
 
 -- parses a mode (ref or val)
@@ -255,16 +294,27 @@ mode -- ~ :: { AST.Mode }
 
 -- parses a sequence of variable declarations
 vars -- ~ :: { [AST.Var] }
-  : vars_ { $$ = reverse $1 }
+  : vars_ 
+    { $$ = reverse $1 
+    ; $1.symtab = $$.symtab
+    }
 -- parses a sequence of variable declarations
 -- WARNING: output in reverse
 vars_ -- ~ :: { [AST.Var] }
   : {- empty -} { $$ = [] }
-  | vars_ var   { $$ = $2:$1 }
+  | vars_ var   
+    { $$ = $2:$1 
+    ; $1.symtab = $$.symtab
+    ; $2.symtab = $$.symtab
+    }
 
 -- parses a variable declaration
 var -- ~ :: { AST.Var }
-  : typename idents ';' { $$ = AST.Var $1 $2 }
+  : typename idents ';' 
+    { $$ = AST.Var $1 $2 
+    ; $1.symtab = $$.symtab
+    ; $1.posn = fst $3
+    }
 
 -- parses a (non-empty) sequence of identifiers
 idents -- ~ :: { [AST.Ident] }
@@ -308,28 +358,28 @@ stmt -- ~ :: { AST.Stmt }
     ; $3.symtab = $$.symtab
     ; where unless (checkAssignRef $$.symtab $1 $3 $1.etype $3.etype
                     || ($1.etype == $3.etype && AST.isAssignableT $1.etype))
-                   (Left $ fmtPos (fst $2) ++ ": bad assignment types")
+                   (fmtErr (fst $2) "bad assignment types")
     } 
   | read lval ';'                    
     { $$ = AST.Read $2
     ; $2.records = $$.records 
     ; $2.symtab = $$.symtab
     ; where unless (AST.isAssignableT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad read type")
+                   (fmtErr (fst $1) "bad read type")
     }
   | write expr ';'                   
     { $$ = AST.Write $2
     ; $2.records = $$.records 
     ; $2.symtab = $$.symtab
     ; where unless (AST.isWriteableT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad write type")
+                   (fmtErr (fst $1) "bad write type")
     }
   | writeln expr ';'                 
     { $$ = AST.Writeln $2 
     ; $2.records = $$.records 
     ; $2.symtab = $$.symtab
     ; where unless (AST.isWriteableT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad writeln type")
+                   (fmtErr (fst $1) "bad writeln type")
     }
   | if expr then stmts else stmts fi 
     { $$ = AST.IfElse $2 $4 $6 
@@ -340,8 +390,7 @@ stmt -- ~ :: { AST.Stmt }
     ; $4.symtab = $$.symtab
     ; $6.symtab = $$.symtab
     ; where unless (AST.isBoolT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad if-then-else "
-                        ++ "condition type")
+                   (fmtErr (fst $1) "bad if-then-else condition type")
     }
   | if expr then stmts fi            
     { $$ = AST.If $2 $4 
@@ -349,8 +398,8 @@ stmt -- ~ :: { AST.Stmt }
     ; $4.records = $$.records 
     ; $2.symtab = $$.symtab
     ; $4.symtab = $$.symtab 
-    ; where unless (AST.isIntT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad if-then condition type")
+    ; where unless (AST.isBoolT $2.etype)
+                   (fmtErr (fst $1) "bad if-then condition type")
     }
   | while expr do stmts od           
     { $$ = AST.While $2 $4 
@@ -359,7 +408,7 @@ stmt -- ~ :: { AST.Stmt }
     ; $2.symtab = $$.symtab
     ; $4.symtab = $$.symtab 
     ; where unless (AST.isBoolT $2.etype)
-                   (Left $ fmtPos (fst $1) ++ ": bad while condition type")
+                   (fmtErr (fst $1) "bad while condition type")
     }
   | call ident '(' exprs ')' ';' {- procedure calls checked later -}
     { $$ = AST.Call $2 $4 
@@ -379,13 +428,13 @@ lval -- ~ :: { AST.LValue }
     { $$ = AST.LField $1 $3
     ; $$.etype = ST.getFieldType $$.records (ST.getProcType $$.symtab $1) $3
     ; where unless (AST.isRecordT $ ST.getProcType $$.symtab $1)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": unknown record alias `" ++ $1 ++ "`")
+                   (fmtErr (fst $2)
+                     $ "unknown record alias `" ++ $1 ++ "`")
     ; where let identT = ST.getProcType $$.symtab $1 in
             let AST.RecordT alias = identT in
             unless (AST.isRecordT identT && not ($$.etype == AST.ErrorT))
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
+                   (fmtErr (fst $2) 
+                      $ "unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
     }
   | ident '[' expr ']'           
     { $$ = AST.LInd $1 $3 
@@ -393,11 +442,11 @@ lval -- ~ :: { AST.LValue }
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in array element index")
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in array element index")
     ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": unknown array alias `" ++ $1 ++ "`")
+                   (fmtErr (fst $2) 
+                      $ "unknown array alias `" ++ $1 ++ "`")
     }
   | ident '[' expr ']' '.' ident 
     { $$ = AST.LIndField $1 $3 $6 
@@ -406,15 +455,16 @@ lval -- ~ :: { AST.LValue }
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
     ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": unknown array alias `" ++ $1 ++ "`")
+                   (fmtErr (fst $2) 
+                      $ "unknown array alias `" ++ $1 ++ "`")
     ; where unless ((not . AST.isArrayT $ ST.getProcType $$.symtab $1)
-                    || (AST.isRecordT . ST.getArrayType $ ST.getProcType $$.symtab $1))
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": unknown array of records `" ++ $1 ++ "`")
+                    || (AST.isRecordT . ST.getArrayType 
+                        $ ST.getProcType $$.symtab $1))
+                   (fmtErr (fst $2) 
+                      $ "unknown array of records `" ++ $1 ++ "`")
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in array element index")
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in array element index")
     }
 
 -- parses a sequence of expressions
@@ -452,13 +502,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless (AST.isBoolT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-boolean expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-boolean expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isBoolT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-boolean expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-boolean expression in right operand of "
+                     ++ show (snd $2))
     }
   | expr and expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_and $1 $3 
@@ -468,13 +518,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless (AST.isBoolT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-boolean expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-boolean expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isBoolT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-boolean expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-boolean expression in right operand of "
+                     ++ show (snd $2))
     }
   | not expr           
     { $$ = AST.UnOpExpr $$.etype AST.Op_not $2
@@ -482,8 +532,8 @@ expr -- ~ :: { AST.Expr }
     ; $2.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless (AST.isBoolT $2.etype)
-                   (Left $ fmtPos (fst $1) 
-                        ++ ": non-boolean expression in " ++ show (snd $1))
+                   (fmtErr (fst $1) 
+                      $ "non-boolean expression in " ++ show (snd $1))
     }
   | expr '=' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_eq $1 $3
@@ -493,19 +543,19 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '!=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_neq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_ne $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '<' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_lt $1 $3
@@ -515,19 +565,19 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '<=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_leq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_le $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '>' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_gt $1 $3
@@ -537,19 +587,19 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '>=' expr     
-    { $$ = AST.BinOpExpr $$.etype AST.Op_geq $1 $3
+    { $$ = AST.BinOpExpr $$.etype AST.Op_ge $1 $3
     ; $1.records = $$.records
     ; $3.records = $$.records 
     ; $1.symtab = $$.symtab
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.BoolT
     ; where unless ($1.etype == $3.etype && AST.isComparableT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": uncomparable types in " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "uncomparable types in " ++ show (snd $2))
     }
   | expr '+' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_add $1 $3
@@ -559,13 +609,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.IntT
     ; where unless (AST.isIntT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in right operand of "
+                     ++ show (snd $2))
     }
   | expr '-' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_sub $1 $3
@@ -575,13 +625,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.IntT
     ; where unless (AST.isIntT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in right operand of "
+                     ++ show (snd $2))
     }
   | expr '*' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_mul $1 $3
@@ -591,13 +641,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.IntT
     ; where unless (AST.isIntT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in right operand of "
+                     ++ show (snd $2))
     }
   | expr '/' expr      
     { $$ = AST.BinOpExpr $$.etype AST.Op_div $1 $3 
@@ -607,13 +657,13 @@ expr -- ~ :: { AST.Expr }
     ; $3.symtab = $$.symtab
     ; $$.etype = AST.IntT
     ; where unless (AST.isIntT $1.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in left "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in left operand of "
+                     ++ show (snd $2))
     ; where unless (AST.isIntT $3.etype)
-                   (Left $ fmtPos (fst $2) 
-                        ++ ": non-integral expression in right "
-                        ++ "operand of " ++ show (snd $2))
+                   (fmtErr (fst $2) 
+                      $ "non-integral expression in right operand of "
+                     ++ show (snd $2))
     } 
   | '-' expr %prec NEG 
     { $$ = AST.UnOpExpr $$.etype AST.Op_neg $2
@@ -621,9 +671,9 @@ expr -- ~ :: { AST.Expr }
     ; $2.symtab = $$.symtab
     ; $$.etype = AST.IntT
     ; where unless (AST.isIntT $2.etype)
-                   (Left $ fmtPos (fst $1) 
-                        ++ ": non-boolean expression in unary " 
-                        ++ show (snd $1))
+                   (fmtErr (fst $1) 
+                      $ "non-boolean expression in unary " 
+                     ++ show (snd $1))
     }
   | lval               
     { $$ = AST.LVal $$.etype $1 
@@ -656,9 +706,6 @@ expr -- ~ :: { AST.Expr }
 
 {
 
-fmtPos :: L.AlexPosn -> String
-fmtPos (L.AlexPn _ l c) = show l ++ ":" ++ show c 
-
 -- runParser 
 -- Parses a [L.Lexeme], validating it is a valid sentence in the Roo CFG
 -- fails if the attribute gramma catches errors  
@@ -672,28 +719,32 @@ runParser ls =
 -- parseError
 -- Called when a error is found when parsing
 parseError :: [L.Lexeme] -> Either String a
-parseError []            = Left "EOF: Unxpected parse error"
-parseError ((posn, t):_) = Left $ fmtPos posn ++ ": unxpected " ++ show t
+parseError []           = Left "EOF: Unexpected parse error"
+parseError ((pos, t):_) = fmtErr pos $ ": unexpected " ++ show t
+
+-- fmtErr
+-- Formats an error message with a position
+fmtErr :: L.AlexPosn -> String -> Either String a
+fmtErr pos msg = Left $ L.fmtPos pos ++ ": " ++ msg
 
 -- checkDuplicate
 -- Checks if a key is found in a list of keys
 -- fail with msg if duplicate is found
-checkDuplicate :: String -> [String] -> String -> Either String ()
-checkDuplicate key keys msg =
+checkDuplicate :: String -> [String] -> L.AlexPosn -> String -> Either String ()
+checkDuplicate key keys pos msg =
   unless (not $ elem key keys)
-         (Left $ msg ++ " `" ++ key ++ "`")
+         (fmtErr pos $ msg ++ " `" ++ key ++ "`")
 
 -- checkDuplicates
 -- Checks if keys contains no duplicates
--- fail with msg if duplicate is found
-checkDuplicates :: (Ord a) => [a] -> String -> Either String ()
-checkDuplicates xs msg = 
- unless (length (LU.nubOrd xs) == length xs) (Left msg)
+-- fail with err if duplicate is found
+checkDuplicates :: (Ord a) => [a] -> Either String () -> Either String ()
+checkDuplicates xs err = unless (noDuplicates xs) err
  
 -- noDuplicates
 -- Checks if a list contains no duplicate elements
 noDuplicates :: (Ord a) => [a] -> Bool
-noDuplicates xs = length (LU.nubOrd xs) == length xs 
+noDuplicates xs = length (nubOrd xs) == length xs 
 
 -- checkAllCalls
 -- Checks if all `call` statements in a Program are correct
@@ -720,7 +771,8 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
     check (AST.IfElse _ ts fs) = checkAll $ ts ++ fs
     check (AST.While _ ss)     = checkAll ss 
     check (AST.Call p args)    = unless (checkCall p args)
-                                        (Left "bad call")
+                                        (Left $ "bad call to `" ++ p
+                                             ++ "` in `" ++ ident ++ "`")
     check _                    = return () 
     checkCall :: AST.Ident -> [AST.Expr] -> Bool
     checkCall proc args = ST.isTableKey proc procs 
@@ -729,93 +781,24 @@ checkProcCalls st (AST.Procedure ident _ _ ss) =
       where 
         callParams = map snd . ST.unParams . fromJust $ lookup proc procs
         validArg :: ST.Param -> AST.Expr -> Bool
-        validArg (ST.Param t m _) a =
-          let tType = ST.getType st t in
-            AST.getExprType a == ST.getType st t
-            && (AST.isLVal a || m == AST.Val)
-               
-
--- entryRecord
--- Converts a AST.Record into a [ST.Entry ST.Record]
-entryRecord :: AST.Record -> ST.Entry ST.Record
-entryRecord (AST.Record fs ident) = (ident, ST.Record $ entryFields fs)
-
--- entryFields
--- Converts a [AST.Field] into a [ST.Entry ST.Field]
-entryFields :: [AST.Field] -> [ST.Entry ST.Field]
-entryFields fs = zipWith entryField fs [0..] 
-
--- entryFields
--- Converts an AST.Field into an ST.Entry ST.Field
-entryField :: AST.Field -> Int -> ST.Entry ST.Field
-entryField (AST.Field t ident) offset = (ident, ST.Field t offset)
-
--- entryArray
--- Converts an AST.Array into an ST.Entry ST.Array
-entryArray :: AST.Array -> ST.Entry ST.Array
-entryArray (AST.Array size t ident) = (ident, ST.Array t (fromInteger size))
-
--- entryProcedure
--- Converts an AST.Procedure into an ST.Entry ST.Procedure with 
--- a ST.SymbolTable
-entryProcedure :: ST.SymbolTable -> AST.Procedure -> ST.Entry ST.Procedure
-entryProcedure st (AST.Procedure ident params vars _) =
-  (ident, ST.Procedure (entryParams params) fixedOffsetVars stackSize)
-  where 
-    vars' :: [ST.Entry ST.Var]
-    vars' = entryVars vars
-    fixedOffsetVars :: [ST.Entry ST.Var]
-    fixedOffsetVars = zipWith fixOffset vars' offsets
-      where fixOffset (ident, v) off = (ident, v { ST.unVOffset = off })
-    offsets :: [Int]
-    offsets = scanl (+) (length params)
-              $ map (ST.lookupSize st . ST.unVType . snd) vars'
-    stackSize :: Int
-    stackSize = last offsets
-
--- entryParams
--- Converts a [AST.Param] into a [ST.Entry ST.Param]
-entryParams :: [AST.Param] -> [ST.Entry ST.Param]
-entryParams params = zipWith entryParam params [0..]
-
--- entryParam
--- Converts an AST.Param into an ST.Entry ST.Param
-entryParam :: AST.Param -> Int -> ST.Entry ST.Param
-entryParam (AST.ParamAlias t ident) offset = 
-  (ident, ST.Param (AST.Alias t) AST.Ref offset)
-entryParam (AST.ParamAtomic t m ident) offset = 
-  (ident, ST.Param (AST.Atomic t) m offset)
-
--- entryVars
--- Converts a [AST.Var] into a [ST.Entry ST.Var]
-entryVars :: [AST.Var] -> [ST.Entry ST.Var]
-entryVars vars = concatMap entryVar vars
-
--- entryVar
--- Converts an AST.Var into an ST.Entry ST.Var
--- ST.unVOffset is erroneous in output
-entryVar :: AST.Var -> [ST.Entry ST.Var]
-entryVar (AST.Var t is) = map (\i -> (i, ST.Var t (-1))) is
+        validArg (ST.Param t m _) a = AST.getExprType a == ST.getType st t
+                                      && (AST.isLVal a || m == AST.Val)
 
 -- checkAssignRef
 -- Checks that an assignment is valid given the types
 checkAssignRef :: ST.SymbolTable -> AST.LValue -> AST.Expr 
                                  -> AST.ExprType -> AST.ExprType -> Bool
-checkAssignRef st lval e lType rType
-  = lType == rType
+checkAssignRef st@(ST.SymbolTable _ _ ps) lval e lType rType
+  = lType == rType && not (null ps) && AST.isLVal e 
     && (AST.isArrayT lType || AST.isRecordT lType) 
-    && not (null procs) && ST.isTableKey rId params
-    && AST.isLVal e && AST.isLId lval
-    && (AST.isLId rval || AST.isLInd rval)
+    && ST.isTableKey rId params && ST.isTableKey lId params
     && lMode == rMode && lMode == AST.Ref
   where 
-    procs = ST.unProcedures st
-    params = ST.unParams . snd $ head procs
+    params = ST.unParams . snd $ head ps
     rval = fromJust $ AST.getLVal e
     rId = AST.getLId rval
     lId = AST.getLId lval
     getMode v = ST.unMode . fromJust $ lookup v params 
     rMode = getMode rId
     lMode = getMode lId
-
 }

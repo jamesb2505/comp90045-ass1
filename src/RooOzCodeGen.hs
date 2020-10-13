@@ -144,7 +144,7 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
       let size = ST.lookupTotalSize st . AST.getTypeName 
                  $ ST.getLValueType st rval
       -- store from right to left manually
-      let unrolled = Oz_load_indirect 0 2
+      let unrolled = Oz_load_indirect 2 0
                    : Oz_store_indirect 1 2
                    : if size > 0
                      then Oz_int_const 2 1

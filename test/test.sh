@@ -3,7 +3,7 @@ make -f ./Makefile;
 printf "\n";
 
 CORRECT=0; TESTS=0
-for ROO in ./testdata/*.roo; do
+for ROO in $(find ./testdata -name '*.roo'); do
     TESTS=$(($TESTS+1))
 
     echo "Compiling $ROO";
@@ -46,4 +46,6 @@ done
 
 rm -f ./test/tmp.out ./test/tmp.oz
 
-printf "%.2f%% correct outputs\n" $((100 * $CORRECT / $TESTS))
+printf "%.2f%% correct outputs from %d tests\n" \
+    $((100 * $CORRECT / $TESTS)) \
+    $TESTS

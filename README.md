@@ -1,7 +1,7 @@
 # Roo Compiler - COMP90045 Project
 
 This project contatins a compiler for the Roo language (see [asg1.pdf](https://github.com/jimbxb/comp90045-project/blob/master/spec/asg1.pdf) for more details), 
-with a target interpretted assembly-like language called Oz (see [asg3.pdf](https://github.com/jimbxb/comp90045-project/blob/master/spec/asg3.pdf) for more details).
+with a target interpretted assembly-like language Oz (see [asg3.pdf](https://github.com/jimbxb/comp90045-project/blob/master/spec/asg3.pdf) for more details).
 
 The compiler is written in Haskell, and makes extensive use of the Haskell tools Happy and Alex, similar to Bison and Flex for C++.
 

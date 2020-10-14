@@ -191,6 +191,8 @@ arr -- ~ :: { AST.Array }
     ; $5.symtab = ST.SymbolTable $$.records [] []
     ; $5.posn = fst $4
     ; $$.posn = fst $1
+    ; where unless ($3 > 0)
+                   (fmtErr (fst $2) $ "non-negative array size " ++ show $3)
     }
 
 -- parses a typename (alias or atomic type)
@@ -720,7 +722,7 @@ runParser ls =
 -- Called when a error is found when parsing
 parseError :: [L.Lexeme] -> Either String a
 parseError []           = Left "EOF: Unexpected parse error"
-parseError ((pos, t):_) = fmtErr pos $ ": unexpected " ++ show t
+parseError ((pos, t):_) = fmtErr pos $ "unexpected " ++ show t
 
 -- fmtErr
 -- Formats an error message with a position

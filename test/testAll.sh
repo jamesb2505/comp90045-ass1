@@ -4,16 +4,16 @@ printf "\n";
 
 COMPILATIONS=0; CORRECT=0; TESTS=0
 for ROO in $(find ./testdata -name '*.roo'); do
-    TESTS=$(($TESTS+1))
+    TESTS=$(($TESTS + 1))
 
     echo "Compiling $ROO";
     if ! ./Roo $ROO > ./test/tmp.oz;
     then
         echo "Compilation failed.";
     else
-        COMPILATIONS=$(($COMPILATIONS+1))
+        COMPILATIONS=$(($COMPILATIONS + 1))
 
-        echo "Compilation successfull.";
+        echo "Compilation successful.";
 
         IN=$(echo $ROO | sed 's/\.roo$/\.in/')
         if [[ -e $IN ]] 
@@ -35,7 +35,7 @@ for ROO in $(find ./testdata -name '*.roo'); do
                 echo $DIFF
             else
                 echo "Correct output"
-                CORRECT=$(($CORRECT+1))
+                CORRECT=$(($CORRECT + 1))
             fi
         else
             echo "Output:"

@@ -1,4 +1,12 @@
 {
+-------------------------
+-- RooLexer
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- A lexer written in alex for the Roo language
+-------------------------
+
 module RooLexer 
   ( runLexer
   , Token(..)

@@ -1,7 +1,7 @@
-module Main (main) where
-
 -------------------------
 -- Roo Language Compiler
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
 --
 -- Command line arguments:
 --  * <filename> 
@@ -12,6 +12,8 @@ module Main (main) where
 --  * -a <filename>
 --      prints the AST representing to Roo program
 -------------------------
+
+module Main (main) where
 
 import RooParser (runParser)
 import RooLexer (runLexer)

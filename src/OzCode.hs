@@ -1,3 +1,11 @@
+-------------------------
+-- OzCode
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Specification for an Oz code data type
+-------------------------
+
 module OzCode where 
 
 import qualified RooAST as AST

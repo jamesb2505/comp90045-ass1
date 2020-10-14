@@ -1,4 +1,14 @@
-module RooOzCodeGen where 
+-------------------------
+-- RooOzCodeGen
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Generates Oz code from processed Roo code
+-------------------------
+
+module RooOzCodeGen
+  ( runCodeGen
+  ) where 
 
 import qualified RooAST as AST
 import qualified RooSymbolTable as ST

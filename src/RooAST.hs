@@ -254,6 +254,12 @@ isArrayT :: ExprType -> Bool
 isArrayT (ArrayT _ _) = True
 isArrayT _            = False
 
+-- isErrorT
+-- True if a ExprType is a ErrorT, else False
+isErrorT :: ExprType -> Bool
+isErrorT ErrorT = True
+isErrorT _      = False
+
 -- getTypeName
 -- Converts an ExprType into a TypeName
 getTypeName :: ExprType -> TypeName

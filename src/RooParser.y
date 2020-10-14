@@ -101,6 +101,7 @@ import Data.Maybe (fromJust)
 ----------------------------
 
 -- parses a Roo Program
+-- ensures `main` procedure exists and has no parameters
 program -- ~ :: { (AST.Program, ST.SymbolTable) }
   : records arrays procedures 
     { $$ = (AST.Program $1 $2 $3, ST.SymbolTable $$.records $$.arrays $$.procs)
@@ -119,6 +120,7 @@ program -- ~ :: { (AST.Program, ST.SymbolTable) }
     }
 
 -- parses a sequence of record declarations
+-- ensures that all records have distinct aliases
 records -- ~ :: { [AST.Record] }
   : records_ 
     { $$ = reverse $1
@@ -139,6 +141,7 @@ records_ -- ~ :: { [AST.Record] }
     }
 
 -- parses a record declaration
+-- ensures all fields have distinct names
 rec -- ~ :: { AST.Record }
   : record '{' fields '}' ident ';' 
     { $$ = AST.Record $3 $5
@@ -175,6 +178,7 @@ arrays -- ~ :: { [AST.Array] }
     ; $$.arrays = reverse $1.arrays
     }
 -- parses a sequence of array declarations
+-- ensures all arrays have distinct names from all other arrays and records
 -- WARNING: output in reverse
 arrays_ -- ~ :: { [AST.Array] }
   : {- empty -} 
@@ -203,11 +207,12 @@ arr -- ~ :: { AST.Array }
     }
 
 -- parses a typename (alias or atomic type)
+-- ensures type aliases are valid
 typename -- ~ :: { AST.TypeName }
   : basetype { $$ = AST.Atomic $1 }
   | ident    
     { $$ = AST.Alias $1 
-    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+    ; where unless (not . AST.isErrorT $ ST.getAliasType $$.symtab $1)
                    (fmtErr $$.posn $ "unknown type `" ++ $1 ++ "`")
     }
 
@@ -220,6 +225,7 @@ procedures -- ~ :: { [AST.Procedure] }
     ; $$.procs = reverse $1.procs
     }
 -- parses a non-empty sequence of procedure definitions
+-- ensures all procedures have distinct names
 -- WARNING: output in reverse
 procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
@@ -241,6 +247,7 @@ procedures_ -- ~ :: { [AST.Procedure] }
     }
 
 -- parses a procedure definition
+-- ensures all parameters and bariables have distinct names
 proc -- ~ :: { AST.Procedure }
   : procedure ident '(' params ')' vars '{' stmts '}' 
     { $$ = AST.Procedure $2 $4 $6 $8 
@@ -287,10 +294,11 @@ params_ -- ~ :: { [AST.Param] }
     }
 
 -- parses a parameter definition
+-- ensures all record/array parameters have a valid type alias
 param -- ~ :: { AST.Param }
   : ident ident         
     { $$ = AST.ParamAlias $1 $2
-    ; where unless (not (AST.ErrorT == (ST.getAliasType $$.symtab $1)))
+    ; where unless (not . AST.isErrorT $ ST.getAliasType $$.symtab $1)
                    (fmtErr $$.posn 
                      $ "unknown type `" ++ $1 ++ "` for `" ++ $2 ++ "`")
     }
@@ -358,6 +366,8 @@ stmts_ -- ~ :: { [AST.Stmt] }
     }  
 
 -- parses a statement
+-- ensures that all types in statements are valid, including assignment
+-- types/modes, boolean conditions, and read/write types
 stmt -- ~ :: { AST.Stmt }
   : lval '<-' expr ';'               
     { $$ = AST.Assign $1 $3 
@@ -426,11 +436,12 @@ stmt -- ~ :: { AST.Stmt }
     }
 
 -- parses an lval
+-- ensures that the types of all identifiers are valid in each type of lval
 lval -- ~ :: { AST.LValue }
   : ident                        
     { $$ = AST.LId $1
     ; $$.etype = ST.getProcType $$.symtab $1
-    ; where unless (not $ $$.etype == AST.ErrorT)
+    ; where unless (not $ AST.isErrorT $$.etype)
                    (Left $ "unknown type alias for `" ++ $1 ++ "`")
     }
   | ident '.' ident              
@@ -441,7 +452,7 @@ lval -- ~ :: { AST.LValue }
                      $ "unknown record alias `" ++ $1 ++ "`")
     ; where let identT = ST.getProcType $$.symtab $1 in
             let AST.RecordT alias = identT in
-            unless (AST.isRecordT identT && not ($$.etype == AST.ErrorT))
+            unless (AST.isRecordT identT && not (AST.isErrorT $$.etype))
                    (fmtErr (fst $2) 
                       $ "unknown field `" ++ $3 ++ "` of `" ++ $1 ++ "`")
     }
@@ -463,11 +474,8 @@ lval -- ~ :: { AST.LValue }
                                              $ ST.getProcType $$.symtab $1) $6
     ; $3.records = $$.records
     ; $3.symtab = $$.symtab 
-    ; where unless (AST.isArrayT $ ST.getProcType $$.symtab $1)
-                   (fmtErr (fst $2) 
-                      $ "unknown array alias `" ++ $1 ++ "`")
-    ; where unless ((not . AST.isArrayT $ ST.getProcType $$.symtab $1)
-                    || (AST.isRecordT . ST.getArrayType 
+    ; where unless ((AST.isArrayT $ ST.getProcType $$.symtab $1)
+                    && (AST.isRecordT . ST.getArrayType 
                         $ ST.getProcType $$.symtab $1))
                    (fmtErr (fst $2) 
                       $ "unknown array of records `" ++ $1 ++ "`")
@@ -502,6 +510,7 @@ exprs_ -- ~ :: { [AST.Expr] }
 
 -- parses an expression
 -- operator precendence is handled as defined above
+-- ensures that expession operands are all of the corect type
 expr -- ~ :: { AST.Expr }
   : expr or expr       
     { $$ = AST.BinOpExpr $$.etype AST.Op_or $1 $3 
@@ -729,7 +738,7 @@ runParser ls =
 -- Called when a error is found when parsing
 parseError :: [L.Lexeme] -> Either String a
 parseError []           = Left "EOF: Unexpected parse error"
-parseError ((pos, t):_) = fmtErr pos $ ": unexpected " ++ show t
+parseError ((pos, t):_) = fmtErr pos $ "unexpected " ++ show t
 
 -- fmtErr
 -- Formats an error message with a position

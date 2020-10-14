@@ -82,4 +82,4 @@ doCodeGen filename = do
 -- prints an error message and exits with failure exit code
 printErrorExit :: Int -> String -> IO a
 printErrorExit code s 
-  = hPutStrLn stderr ("ERROR:\n" ++ s) >> exitWith (ExitFailure code)
+  = hPutStrLn stderr ("Error:\n" ++ s) >> exitWith (ExitFailure code)

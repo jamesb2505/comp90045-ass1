@@ -1,4 +1,13 @@
 {
+-------------------------
+-- RooParser
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- A parser for the Roo language written in happy
+-- Semantic analysis is also performed
+-------------------------
+
 module RooParser 
   ( runParser
   ) where
@@ -710,7 +719,7 @@ expr -- ~ :: { AST.Expr }
 
 -- runParser 
 -- Parses a [L.Lexeme], validating it is a valid sentence in the Roo CFG
--- fails if the attribute gramma catches errors  
+-- fails if the attribute grammar catches errors  
 runParser :: [L.Lexeme] -> Either String (AST.Program, ST.SymbolTable)
 runParser ls =
   do

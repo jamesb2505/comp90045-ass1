@@ -1,3 +1,11 @@
+-------------------------
+-- PrettyRoo
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Handles pretty printing of Roo code
+-------------------------
+
 module PrettyRoo (prettyPrint) where
 
 import RooAST

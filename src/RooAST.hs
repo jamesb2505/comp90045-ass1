@@ -1,8 +1,12 @@
-module RooAST where
-
------------------------------------
+-------------------------
+-- RooAST
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
 -- Specification of an AST for Roo
------------------------------------
+-------------------------
+
+module RooAST where
 
 type Ident = String
 

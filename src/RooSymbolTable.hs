@@ -1,3 +1,11 @@
+-------------------------
+-- Roo Language Compiler
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Specification for a symbol table for Roo
+-------------------------
+
 module RooSymbolTable where
 
 import qualified RooAST as AST

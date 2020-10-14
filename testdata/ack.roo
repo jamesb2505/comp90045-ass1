@@ -26,7 +26,7 @@ procedure main ()
             write n;
             write ") = ";
             write v;
-            write "; ";
+            write "; \t";
             n <- n + 1;
         od
         writeln "";

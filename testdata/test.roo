@@ -1,0 +1,157 @@
+record
+    { integer i
+    ; boolean b
+    } rec;
+array[10] integer arr;
+array[10] rec arr_rec;
+
+procedure main ()
+    integer i, j;
+    boolean b;
+    rec r;
+    arr a;
+    arr_rec ar;
+{
+    write i;
+    writeln " (0)";
+    write 1 + 2;
+    writeln " (3)";
+    write 1 - 2;
+    writeln " (-1)";
+    write 1 * 2;
+    writeln " (2)";
+    write 1 / 2;
+    writeln " (0)";
+    write -1;
+    writeln " (-1)";
+    write false or false;
+    writeln " (false)";
+    write false and false;
+    writeln " (false)";
+    write not (1 < 0);
+    writeln " (true)";
+    write 1 < 2;
+    writeln " (true)";
+    write 1 <= 2;
+    writeln " (true)";
+    write 1 = 2;
+    writeln " (false)";
+    write 1 >= 2;
+    writeln " (false)";
+    write 1 > 2;
+    writeln " (false)";
+    write false < true;
+    writeln " (true)";
+    write false <= true;
+    writeln " (true)";
+    write false = true;
+    writeln " (false)";
+    write false >= true;
+    writeln " (false)";
+    write false > true;
+    writeln " (false)";
+    i <- 1;
+    write i;
+    writeln " (1)";
+    j <- i;
+    write j;
+    writeln " (1)";
+    r.i <- 1;
+    write r.i;
+    writeln " (1)";
+    r.b <- true and false;
+    write r.b < false;
+    writeln " (false)";
+    a[1] <- 1;
+    write a[1];
+    writeln " (1)";
+    a[0] <- 10;
+    a[a[1]] <- 0;
+    write a[a[1]];
+    writeln " (10)";
+    ar[1].b <- true;
+    write ar[1].b;
+    writeln " (true)";
+    call p0(r);
+    write r.i;
+    writeln " (10)";
+    ar[0].i <- 0;
+    r.i <- 1;
+    call p1(ar[0], r, b);
+    write b;
+    writeln " (false)";
+    b <- true;
+    call p2(b);
+    write b;
+    writeln " (true)";
+    i <- 0;
+    call p3(i);
+    write i;
+    writeln " (1)";
+    call p4(r, ar[1]);
+    call p1(r, ar[1], b);
+    write b;
+    writeln " (true)";
+    i <- 0;
+    while i < 10 do
+        write i;
+        i <- i + 1;
+    od
+    writeln " (0123456789)";
+    call p5();
+    writeln " (cool)";
+    call p7(r);
+    writeln " (true)";
+    if 1 < 2 then
+        write "okay";
+    fi
+    writeln " (okay)";
+}
+
+procedure p0 (rec r)
+{
+    r.i <- 10;
+}
+
+procedure p1 (rec r0, rec r1, boolean ret)
+{
+    ret <- r0.i = r1.i and r0.b = r1.b;
+}
+
+procedure p2 (boolean val b)
+{
+    b <- false;
+}
+
+procedure p3 (integer i)
+{
+    i <- 1;
+}
+
+procedure p4 (rec r0, rec r1)
+{
+    r0 <- r1;
+}
+
+procedure p5 ()
+{
+    if false then
+        call p5();
+    else
+        call p6();
+    fi
+}
+
+procedure p6 ()
+{
+    write "cool";
+}
+
+procedure p7 (rec r0) 
+    rec r1;
+    boolean b;
+{
+    call p4(r1, r0);
+    call p1(r1, r0, b);
+    write b;
+}

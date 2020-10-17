@@ -172,7 +172,7 @@ instance Show Token where
   show T_div        = "`/`"
   show (T_string s) = "string " ++ show s
   show (T_number n) = "number " ++ show n
-  show (T_ident s)  = "identifier " ++ show s
+  show (T_ident s)  = "identifier `" ++ s ++ "`"
 
 type Lexeme = (AlexPosn, Token)
 

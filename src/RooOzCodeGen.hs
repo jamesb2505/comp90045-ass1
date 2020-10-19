@@ -423,26 +423,24 @@ getLocalOffsetErr st alias err = maybeErr err $ ST.getLocalOffset st alias
 
 -- peephole
 -- Performs peephole optimisations
---  * load address, store inderect -> store
---  * load_address, load indirect  -> load
+--  * load address, store_indirect -> store
+--  * load_address, load_indirect  -> load
 peephole :: [OzCode] -> [OzCode] 
-peephole code = reverse $ peephole' [] code
-  where
-    peephole' res (Oz_load_address rLoad slot:Oz_store_indirect rStore rVal:cs)
-      | rLoad == rStore = peephole' (Oz_store slot rVal:res) cs
-    peephole' res (Oz_load_address rLoad slot:Oz_load_indirect rInd rVal:cs)
-      | rLoad == rInd = peephole' (Oz_load rVal slot:res) cs
-    peephole' res (c:cs) = peephole' (c:res) cs
-    peephole' res [] = res
+peephole (Oz_load_address rLoad slot:Oz_store_indirect rStore rVal:cs)
+  | rLoad == rStore = peephole (Oz_store slot rVal:cs)
+peephole (Oz_load_address rLoad slot:Oz_load_indirect rInd rVal:cs)
+  | rLoad == rInd = peephole (Oz_load rVal slot:cs)
+peephole (c:cs) = c:peephole cs
+peephole [] = []
 
 -- coerceLabels
--- Coerces concurrent labels into one, as branches to either 
+-- Coerces concurrent branch labels into one, as branches to either 
 -- label is equivalent
 coerceLabels :: [OzCode] -> [OzCode]
 coerceLabels code = coerceLabels' code code
   where
-    coerceLabels' (aLabel@(Oz_label a):rest@(Oz_label b:cs)) toCoerce
-      = coerceLabels' rest (filter (/= aLabel) $ map coerce toCoerce)
+    coerceLabels' (aOz@(Oz_label a):cs@(Oz_label b:_)) toCoerce
+      = coerceLabels' cs (filter (/= aOz) $ map coerce toCoerce)
       where
         coerce (Oz_branch_on_true r a')
           | a == a' = Oz_branch_on_true r b
@@ -452,6 +450,6 @@ coerceLabels code = coerceLabels' code code
           | a == a' = Oz_branch_uncond b
         coerce (Oz_call a')
           | a == a' = Oz_call b
-        coerce code = code
+        coerce c = c
     coerceLabels' (_:cs) coerced = coerceLabels' cs coerced
     coerceLabels' [] coerced = coerced

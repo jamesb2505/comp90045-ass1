@@ -83,67 +83,67 @@ tableKeys = map fst
 isTableKey :: AST.Ident -> Table a -> Bool
 isTableKey alias table = elem alias $ tableKeys table               
 
--- entryRecord
+-- convertRecord
 -- Converts a AST.Record into a [Entry Record]
-entryRecord :: AST.Record -> Entry Record
-entryRecord (AST.Record fs ident) = (ident, Record $ entryFields fs)
+convertRecord :: AST.Record -> Entry Record
+convertRecord (AST.Record fs ident) = (ident, Record $ convertFields fs)
 
--- entryFields
+-- convertFields
 -- Converts a [AST.Field] into a [Entry Field]
-entryFields :: [AST.Field] -> [Entry Field]
-entryFields fs = zipWith entryField fs [0..] 
+convertFields :: [AST.Field] -> [Entry Field]
+convertFields fs = zipWith convertField fs [0..] 
 
--- entryFields
+-- convertFields
 -- Converts an AST.Field into an Entry Field
-entryField :: AST.Field -> Int -> Entry Field
-entryField (AST.Field t ident) offset = (ident, Field t offset)
+convertField :: AST.Field -> Int -> Entry Field
+convertField (AST.Field t ident) offset = (ident, Field t offset)
 
--- entryArray
+-- convertArray
 -- Converts an AST.Array into an Entry Array
-entryArray :: AST.Array -> Entry Array
-entryArray (AST.Array size t ident) = (ident, Array t (fromInteger size))
+convertArray :: AST.Array -> Entry Array
+convertArray (AST.Array size t ident) = (ident, Array t (fromInteger size))
 
--- entryProcedure
+-- convertProcedure
 -- Converts an AST.Procedure into an Entry Procedure with 
 -- a SymbolTable
-entryProcedure :: SymbolTable -> AST.Procedure -> Entry Procedure
-entryProcedure st (AST.Procedure ident params vars _) =
-  (ident, Procedure (entryParams params) fixedOffsetVars stackSize)
+convertProcedure :: SymbolTable -> AST.Procedure -> Entry Procedure
+convertProcedure st (AST.Procedure ident params vars _) =
+  (ident, Procedure (convertParams params) fixedOffsetVars stackSize)
   where 
     vars' :: [Entry Var]
-    vars' = entryVars vars
+    vars' = convertVars vars
     fixedOffsetVars :: [Entry Var]
     fixedOffsetVars = zipWith fixOffset vars' offsets
-      where fixOffset (ident, v) off = (ident, v { unVOffset = off })
+      where fixOffset (vIdent, v) off = (vIdent, v { unVOffset = off })
     offsets :: [Int]
     offsets = scanl (+) (length params)
               $ map (lookupTotalSize st . unVType . snd) vars'
     stackSize :: Int
     stackSize = last offsets
 
--- entryParams
+-- convertParams
 -- Converts a [AST.Param] into a [Entry Param]
-entryParams :: [AST.Param] -> [Entry Param]
-entryParams params = zipWith entryParam params [0..]
+convertParams :: [AST.Param] -> [Entry Param]
+convertParams params = zipWith convertParam params [0..]
 
--- entryParam
+-- convertParam
 -- Converts an AST.Param into an Entry Param
-entryParam :: AST.Param -> Int -> Entry Param
-entryParam (AST.ParamAlias t ident) offset = 
+convertParam :: AST.Param -> Int -> Entry Param
+convertParam (AST.ParamAlias t ident) offset = 
   (ident, Param (AST.Alias t) AST.Ref offset)
-entryParam (AST.ParamAtomic t m ident) offset = 
+convertParam (AST.ParamAtomic t m ident) offset = 
   (ident, Param (AST.Atomic t) m offset)
 
--- entryVars
+-- convertVars
 -- Converts a [AST.Var] into a [Entry Var]
-entryVars :: [AST.Var] -> [Entry Var]
-entryVars vars = concatMap entryVar vars
+convertVars :: [AST.Var] -> [Entry Var]
+convertVars vars = concatMap convertVar vars
 
--- entryVar
+-- convertVar
 -- Converts an AST.Var into an Entry Var
 -- unVOffset is erroneous in output
-entryVar :: AST.Var -> [Entry Var]
-entryVar (AST.Var t is) = map (\i -> (i, Var t (-1))) is
+convertVar :: AST.Var -> [Entry Var]
+convertVar (AST.Var t is) = map (\i -> (i, Var t (-1))) is
 
 -- isRef
 -- Checks if an Ident is in Reference mode
@@ -224,7 +224,7 @@ getAliasType st ident = getType st (AST.Alias ident)
 -- Gets the ExprType of a given Field (Ident) of a RecordT
 -- ErrorT is returned if Field is not found in any context
 getFieldType :: Table Record -> AST.ExprType -> AST.Ident -> AST.ExprType
-getFieldType rs rt@(AST.RecordT r) f
+getFieldType rs (AST.RecordT r) f
     = case lookup r rs >>= lookup f . unFields of
         Nothing                       -> AST.ErrorT
         (Just (Field AST.BoolType _)) -> AST.BoolT
@@ -241,7 +241,7 @@ getArrayType _                = AST.ErrorT
 -- getLValueType
 getLValueType :: SymbolTable -> AST.LValue -> AST.ExprType
 getLValueType st (AST.LId alias) = getProcType st alias
-getLValueType st@(SymbolTable _ as _) (AST.LInd alias _)
+getLValueType st (AST.LInd alias _)
   | AST.isArrayT aliasType
     = getArrayType aliasType
   where aliasType = getProcType st alias
@@ -270,6 +270,7 @@ lookupTotalSize _ _ = 1
 
 -- lookupElementSize
 -- Looks up up the size of an element of a givent AST.TypeName
+lookupElementSize :: SymbolTable -> AST.TypeName -> Int
 lookupElementSize st@(SymbolTable _ as _) (AST.Alias alias)
   | isTableKey alias as
     = lookupTotalSize st t

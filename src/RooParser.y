@@ -16,9 +16,9 @@ import qualified RooSymbolTable as ST
 import qualified RooLexer as L
 import qualified RooAST as AST
 
-import Data.Containers.ListUtils (nubOrd)
 import Control.Monad (unless)
 import Data.Maybe (fromJust)
+import Data.List (nub)
 }
 
 %name runHappy program
@@ -145,7 +145,7 @@ records_ -- ~ :: { [AST.Record] }
 rec -- ~ :: { AST.Record }
   : record '{' fields '}' ident ';' 
     { $$ = AST.Record $3 $5
-    ; $$.records = [ ST.entryRecord $$ ]
+    ; $$.records = [ ST.convertRecord $$ ]
     ; $$.posn = fst $1
     ; where unless (noDuplicates (map (\(AST.Field _ i) -> i) $3 ))
                    (fmtErr $$.posn 
@@ -200,7 +200,7 @@ arrays_ -- ~ :: { [AST.Array] }
 arr -- ~ :: { AST.Array }
   : array '[' number ']' typename ident ';' 
     { $$ = AST.Array $3 $5 $6
-    ; $$.arrays = [ ST.entryArray $$ ]
+    ; $$.arrays = [ ST.convertArray $$ ]
     ; $5.symtab = ST.SymbolTable $$.records [] []
     ; $5.posn = fst $4
     ; $$.posn = fst $1
@@ -233,7 +233,7 @@ procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
     { $$ = [$1]
     ; $$.procs 
-        = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
+        = [ ST.convertProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
     }
@@ -254,7 +254,7 @@ proc -- ~ :: { AST.Procedure }
   : procedure ident '(' params ')' vars '{' stmts '}' 
     { $$ = AST.Procedure $2 $4 $6 $8 
     ; $$.procs 
-        = [ ST.entryProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
+        = [ ST.convertProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
     ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
@@ -750,7 +750,8 @@ fmtErr pos msg = Left $ L.fmtPos pos ++ ": " ++ msg
 -- checkDuplicate
 -- Checks if a key is found in a list of keys
 -- fail with msg if duplicate is found
-checkDuplicate :: String -> [String] -> L.AlexPosn -> String -> Either String ()
+checkDuplicate :: String -> [String] 
+               -> L.AlexPosn -> String -> Either String ()
 checkDuplicate key keys pos msg =
   unless (not $ elem key keys)
          (fmtErr pos $ msg ++ " `" ++ key ++ "`")
@@ -758,13 +759,13 @@ checkDuplicate key keys pos msg =
 -- checkDuplicates
 -- Checks if keys contains no duplicates
 -- fail with err if duplicate is found
-checkDuplicates :: (Ord a) => [a] -> Either String () -> Either String ()
+checkDuplicates :: (Eq a) => [a] -> Either String () -> Either String ()
 checkDuplicates xs err = unless (noDuplicates xs) err
  
 -- noDuplicates
 -- Checks if a list contains no duplicate elements
-noDuplicates :: (Ord a) => [a] -> Bool
-noDuplicates xs = length (nubOrd xs) == length xs 
+noDuplicates :: (Eq a) => [a] -> Bool
+noDuplicates xs = length (nub xs) == length xs 
 
 -- checkAllCalls
 -- Checks if all `call` statements in a Program are correct

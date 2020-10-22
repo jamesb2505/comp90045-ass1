@@ -18,8 +18,8 @@ runCTrans (AST.Program rs as ps) st =
     return $ "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n" 
           ++ unlines typedefs
           ++ unlines forwardDecs 
-          ++ "\nint main(int argc, int *argv[]) {\n"
-          ++ "    main_p();\n    return 0;\n}\n\n"
+          ++ "\nint main(int argc, int *argv[]) {\n\
+             \    main_p();\n    return 0;\n}\n\n"
           ++ unlines procs 
 
 transTypedefs :: [AST.Record] -> [AST.Array] -> Either String [String]
@@ -126,14 +126,14 @@ transStmt st (AST.Read l) =
     lCode <- transLValue st l  
     case ST.getLValueType st l of
       AST.IntT  -> return $ [ "if (scanf(\"%d\", " ++ lCode
-                              ++ ") != 1) { fprintf(stderr, "
-                              ++ "\"cannot read integer\\n\"); exit(1); }" ]
-      AST.BoolT -> return $ [ "{ char buf[256]; " 
-                              ++ "if (scanf(\"%s\", buf) <= 0 "
-                              ++ "|| (strcmp(buf, \"true\") "
-                              ++ "&& strcmp(buf, \"false\"))) { "
-                              ++ "fprintf(stderr, "
-                              ++ "\"cannot read boolean\\n\"); exit(1); } *" 
+                              ++ ") != 1) { fprintf(stderr, \
+                                 \\"cannot read integer\\n\"); exit(1); }" ]
+      AST.BoolT -> return $ [ "{ char buf[256]; \
+                              \if (scanf(\"%s\", buf) <= 0 \
+                              \|| !(strcmp(buf, \"true\") \
+                              \|| strcmp(buf, \"false\"))) { \
+                              \fprintf(stderr, \
+                              \\"cannot read boolean\\n\"); exit(1); } *"
                               ++ lCode ++ " = strcmp(buf, \"true\") == 0; }" ]
       _         -> Left "bad read type"
 transStmt st (AST.Write e) = 

@@ -18,8 +18,10 @@ module Main (main) where
 import RooParser (runParser)
 import RooLexer (runLexer)
 import RooOzCodeGen (runCodeGen)
+import RooCTrans (runCTrans)
 import OzCode (printOzCodes)
 import RooAST (Program)
+import RooSymbolTable (SymbolTable)
 import PrettyRoo (prettyPrint)
 
 import System.Environment (getArgs, getProgName)
@@ -30,6 +32,7 @@ data Task
   = Parse String
   | PrettyPrint String
   | CodeGen String
+  | CTrans String
   deriving (Eq, Show)
 
 main :: IO ()
@@ -40,7 +43,8 @@ main = do
   case task of
     Parse filename       -> doParse show filename
     PrettyPrint filename -> doParse prettyPrint filename
-    CodeGen filename     -> doCodeGen filename
+    CodeGen filename     -> doCodeGen runCodeGen printOzCodes filename
+    CTrans filename      -> doCodeGen runCTrans putStrLn filename
 
 -- checkArgs
 -- checks for valid command line arguments
@@ -52,6 +56,8 @@ checkArgs _ ["-a", filename] =
   return $ Parse filename
 checkArgs _ ["-p", filename] =
   return $ PrettyPrint filename
+checkArgs _ ["-c", filename] =
+  return $ CTrans filename
 checkArgs _ [filename] =
   return $ CodeGen filename
 checkArgs progname _ =
@@ -69,12 +75,13 @@ doParse f filename = do
 
 -- doCodeGen
 -- generates Oz code for a given filename
-doCodeGen :: String -> IO ()
-doCodeGen filename = do
+doCodeGen :: (Program -> SymbolTable -> Either String b) -> (b -> IO ()) 
+          -> String -> IO ()
+doCodeGen trans printer filename = do
   input <- readFile filename
-  case runLexer input >>= runParser >>= uncurry runCodeGen of
+  case runLexer input >>= runParser >>= uncurry trans of
     Left err    -> printErrorExit 2 err
-    Right codes -> printOzCodes codes
+    Right codes -> printer codes
 
 -- printErrorExit
 -- prints an error message and exits with failure exit code

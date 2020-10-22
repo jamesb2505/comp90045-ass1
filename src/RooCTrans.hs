@@ -119,7 +119,7 @@ transStmt st (AST.Assign lval (AST.LVal _ rval))
       let size = ST.lookupTotalSize st . AST.getTypeName 
                  $ ST.getLValueType st rval
       return [ "memcpy(" ++ lCode ++ ", " ++ rCode 
-               ++ ", " ++ show size ++ " * sizeof(int));" ]
+               ++ ", (" ++ show size ++ ") * sizeof(int));" ]
 transStmt st (AST.Assign l e) = 
   do 
     lCode <- transLValue st l
@@ -191,7 +191,7 @@ transStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
     if ST.isTableKey name ps
     then return [ fmtProcName name ++ "(" ++ intercalate ", " pCode ++ ");" ]
     else Left $ "unknown procedure `" ++ name ++ "`"
-    
+
 transArg :: ST.Param -> AST.Expr -> Either String String
 transArg (ST.Param _ AST.Ref _) (AST.LVal _ lval) 
   = transLValue st lval

@@ -17,7 +17,6 @@ runCTrans (AST.Program rs as ps) st =
     procs <- transProcs st ps
     return $ "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n" 
           ++ unlines typedefs
-          ++ (if null typedefs then "" else "\n")
           ++ unlines forwardDecs 
           ++ "\nint main(int argc, int *argv[]) {\n"
           ++ "    main_p();\n\n    return 0;\n}\n\n"
@@ -53,16 +52,12 @@ transForwardDec :: AST.Procedure -> Either String String
 transForwardDec p = (++ ";") <$> transProcHeader p
 
 transProcHeader :: AST.Procedure -> Either String String 
-transProcHeader (AST.Procedure name ps _ _) =
-  do
-    params <- transParams ps
-    return $ "void " ++ fmtProcName name ++ "(" ++ params ++ ")"
+transProcHeader (AST.Procedure name ps _ _) 
+  = ("void " ++) <$> (fmtProcName name ++) <$> ("(" ++) 
+    <$> (++ ")") <$> transParams ps
 
 transParams :: [AST.Param] -> Either String String
-transParams ps =
-  do
-    params <- mapM transParam ps
-    return $ intercalate ", " params 
+transParams ps = intercalate ", " <$> mapM transParam ps 
 
 transParam :: AST.Param -> Either String String
 transParam (AST.ParamAtomic t mode ident)
@@ -187,15 +182,15 @@ transStmt st (AST.While e ss) =
 transStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
   do 
     let params = map snd . ST.unParams . fromJust $ lookup name ps
-    pCode <- mapM (uncurry transArg) (zip params args)
+    pCode <- mapM (uncurry (transArg st)) (zip params args)
     if ST.isTableKey name ps
     then return [ fmtProcName name ++ "(" ++ intercalate ", " pCode ++ ");" ]
     else Left $ "unknown procedure `" ++ name ++ "`"
 
-transArg :: ST.Param -> AST.Expr -> Either String String
-transArg (ST.Param _ AST.Ref _) (AST.LVal _ lval) 
+transArg :: ST.SymbolTable -> ST.Param -> AST.Expr -> Either String String
+transArg st (ST.Param _ AST.Ref _) (AST.LVal _ lval) 
   = transLValue st lval
-transArg _ e 
+transArg st _ e 
   = transExpr st e
 
 transExpr :: ST.SymbolTable -> AST.Expr -> Either String String
@@ -209,12 +204,12 @@ transExpr st (AST.BinOpExpr _ op a b) =
     bCode <- transExpr st b
     return $ "(" ++ aCode ++ ") " ++ fmtBinOp op ++ " (" ++ bCode ++ ")" 
 transExpr st (AST.UnOpExpr _ op a) 
-  = (++ ")") <$> (fmtUnOp op ++) <$> ("(" ++) <$> transExpr st a
+  = (fmtUnOp op ++) <$> ("(" ++) <$> (++ ")") <$> transExpr st a
 
 transLValue :: ST.SymbolTable -> AST.LValue -> Either String String
 transLValue st (AST.LId ident) 
   = return $ if ST.isRef st ident
-             then "" ++ fmtIdent ident
+             then fmtIdent ident
              else "&" ++ fmtIdent ident
 transLValue st (AST.LField ident field) 
   = return $ if ST.isRef st ident

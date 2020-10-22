@@ -129,12 +129,15 @@ transStmt st (AST.Read l) =
                               ++ ") != 1) { fprintf(stderr, \
                                  \\"cannot read integer\\n\"); exit(1); }" ]
       AST.BoolT -> return $ [ "{ char buf[256]; \
-                              \if (scanf(\"%s\", buf) <= 0 \
-                              \|| !(strcmp(buf, \"true\") \
-                              \|| strcmp(buf, \"false\"))) { \
+                              \if (scanf(\"%s\", buf) <= 0) { \
                               \fprintf(stderr, \
-                              \\"cannot read boolean\\n\"); exit(1); } *"
-                              ++ lCode ++ " = strcmp(buf, \"true\") == 0; }" ]
+                              \\"cannot read bool\\n\"); exit(1); \
+                              \} else if (!strcmp(buf, \"true\")) { *"
+                              ++ lCode ++ " = 1; \
+                              \} else if (!strcmp(buf, \"false\")) { *"
+                              ++ lCode ++ " = 0; \
+                              \} else { fprintf(stderr, \
+                              \\"read invalid bool\\n\"); exit(1); } }" ]
       _         -> Left "bad read type"
 transStmt st (AST.Write e) = 
   do

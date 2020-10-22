@@ -19,7 +19,7 @@ runCTrans (AST.Program rs as ps) st =
           ++ unlines typedefs
           ++ unlines forwardDecs 
           ++ "\nint main(int argc, int *argv[]) {\n"
-          ++ "    main_p();\n\n    return 0;\n}\n\n"
+          ++ "    main_p();\n    return 0;\n}\n\n"
           ++ unlines procs 
 
 transTypedefs :: [AST.Record] -> [AST.Array] -> Either String [String]
@@ -134,22 +134,15 @@ transStmt st (AST.Read l) =
                               ++ "fprintf(stderr, "
                               ++ "\"cannot read boolean\\n\"); exit(1); } *" 
                               ++ lCode ++ " = strcmp(buf, \"true\") == 0; }" ]
-      _         -> Left "bad read"
+      _         -> Left "bad read type"
 transStmt st (AST.Write e) = 
   do
     eCode <- transExpr st e
     case AST.getExprType e of
       AST.BoolT -> return [ "printf(" ++ eCode ++ " ? \"true\" : \"false\");" ]
       AST.IntT  -> return [ "printf(\"%d\", " ++ eCode ++ ");" ]
-      AST.StrT  -> return $ if doStr
-                            then [ "printf(" ++ eCode ++ ");" ]
-                            else []
+      AST.StrT  -> return [ "printf(\"%s\", " ++ eCode ++ ");" ]
       _         -> Left "bad write type"
-  where 
-    doStr = case e of
-              AST.StrConst _ "" -> False
-              AST.StrConst _ _  -> True
-              _                 -> False
 transStmt st (AST.Writeln e) = 
   do 
     writeCode <- transStmt st (AST.Write e)

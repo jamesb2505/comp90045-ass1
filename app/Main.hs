@@ -11,6 +11,8 @@
 --      errors
 --  * -a <filename>
 --      prints the AST representing to Roo program
+--  * -c <filename>
+--      prints C code equivalent to the Roo code; beware of undefined behaviour
 -------------------------
 
 module Main (main) where
@@ -74,7 +76,7 @@ doParse f filename = do
     Right (parsed,_) -> putStrLn $ f parsed
 
 -- doCodeGen
--- generates Oz code for a given filename
+-- generates C code for a given filename
 doCodeGen :: (Program -> SymbolTable -> Either String b) -> (b -> IO ()) 
           -> String -> IO ()
 doCodeGen trans printer filename = do

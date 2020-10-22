@@ -38,7 +38,8 @@ transRecord (AST.Record fs alias) =
           ++ "\n} " ++ fmtAlias alias ++ ";"
 
 transField :: AST.Field -> Either String String
-transField (AST.Field t name) = return $ fmtAtomic t ++ " " ++ name ++ ";"
+transField (AST.Field t name) = return $ fmtAtomic t ++ " " 
+                                      ++ fmtField name ++ ";"
 
 transArray :: AST.Array -> Either String String
 transArray (AST.Array size t alias) 
@@ -206,8 +207,8 @@ transLValue st (AST.LId ident)
              else "&" ++ fmtIdent ident
 transLValue st (AST.LField ident field) 
   = return $ if ST.isRef st ident
-             then "&" ++ fmtIdent ident ++ "->" ++ field
-             else "&" ++ fmtIdent ident ++ "." ++ field
+             then "&" ++ fmtIdent ident ++ "->" ++ fmtField field
+             else "&" ++ fmtIdent ident ++ "." ++ fmtField field
 transLValue st (AST.LInd ident e) =
   do 
     eCode <- transExpr st e
@@ -218,29 +219,33 @@ transLValue st (AST.LIndField ident e field) =
   do 
     eCode <- transExpr st e
     return $ if ST.isRef st ident
-             then "&(*" ++ fmtIdent ident ++ ")[" ++ eCode ++ "]." ++ field
+             then "&(*" ++ fmtIdent ident ++ ")[" ++ eCode ++ "]."
+                  ++ fmtField field
              else "&(" ++ fmtIdent ident ++ "[" ++ eCode ++ "]." 
-                  ++ field ++ ")"
+                  ++ fmtField field ++ ")"
 
 fmtAtomic :: AST.AtomicType -> String
 fmtAtomic _ = "int"
 
 fmtAlias :: AST.Ident -> String
-fmtAlias a = a ++ "_t"
+fmtAlias a = fmtIdentifier a ++ "_t"
 
 fmtType :: AST.TypeName -> String
 fmtType (AST.Alias a) = fmtAlias a
 fmtType _             = "int"
 
 fmtProcName :: AST.Ident -> String
-fmtProcName name = name ++ "_p"
+fmtProcName name = fmtIdentifier name ++ "_p"
+
+fmtField :: AST.Ident -> String
+fmtField f = fmtIdentifier f
 
 fmtMode :: AST.Mode -> String
 fmtMode AST.Ref = "*"
 fmtMode AST.Val = ""
 
 fmtIdent :: AST.Ident -> AST.Ident
-fmtIdent ident = ident ++ "_i"
+fmtIdent ident = fmtIdentifier ident ++ "_i"
 
 indent :: String -> String
 indent s = "    " ++ s
@@ -262,3 +267,8 @@ fmtBinOp AST.Op_div = "/"
 fmtUnOp :: AST.UnOp -> String
 fmtUnOp AST.Op_not = "!"
 fmtUnOp AST.Op_neg = "-"
+
+fmtIdentifier :: AST.Ident -> String
+fmtIdentifier ('\'':ss) = "__APOSTROPHE__" ++ fmtIdentifier ss
+fmtIdentifier (s:ss) = s:fmtIdentifier ss
+fmtIdentifier [] = []

@@ -20,13 +20,11 @@ import RooLexer (runLexer)
 import RooOzCodeGen (runCodeGen)
 import OzCode (printOzCodes)
 import RooAST (Program)
-import RooSymbolTable (SymbolTable)
 import PrettyRoo (prettyPrint)
 
 import System.Environment (getArgs, getProgName)
 import System.Exit (ExitCode(..), exitWith)
 import System.IO (hPutStrLn, stderr)
-import Data.List (intercalate)
 
 data Task
   = Parse String

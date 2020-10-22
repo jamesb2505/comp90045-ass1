@@ -209,7 +209,7 @@ runLexer str = go (alexStartPos,'\n',[],str)
                             ++ replicate (c - 1) ' ' ++ "^ here"
                        else ""
              in Left $ fmtPos p ++ ": lexical error" ++ err
-        AlexSkip inp' len     
+        AlexSkip inp' _     
           -> go inp' 
         AlexToken inp' len act 
           -> go inp' >>= Right . (:) (act pos $ take len s)

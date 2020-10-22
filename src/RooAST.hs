@@ -267,3 +267,4 @@ getTypeName (RecordT alias) = Alias alias
 getTypeName (ArrayT alias _) = Alias alias
 getTypeName BoolT = Atomic BoolType
 getTypeName IntT = Atomic IntType
+getTypeName e = error $ "TypeName undefined for " ++ show e

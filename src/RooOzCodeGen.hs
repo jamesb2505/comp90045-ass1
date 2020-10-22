@@ -16,7 +16,6 @@ import OzCode
 
 import Control.Monad.State (State, evalState, put, get)
 import Control.Monad.Except (ExceptT, runExceptT, liftEither, liftM, lift)
-import Data.List (intercalate)
 
 -- Gen
 -- Data type for a generator
@@ -143,10 +142,8 @@ genProcedure st@(ST.SymbolTable _ _ ps) (AST.Procedure name _ _ ss) =
 -- procedures of the ST.SymbolTable
 genStmt :: ST.SymbolTable -> AST.Stmt -> GenState [OzCode]
 genStmt st (AST.Assign lval (AST.LVal _ rval))
-  | ST.isRef st lAlias && ST.isRef st rAlias
+  | ST.isRef st (AST.getLId lval) && ST.isRef st (AST.getLId rval)
   = do 
-      lOffset <- getOffset lAlias
-      rOffset <- getOffset rAlias
       putRegister 0
       lCode <- genLValue st lval
       putRegister 1
@@ -158,13 +155,12 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
                    : Oz_store_indirect 0 2
                    : if size > 0
                      then Oz_int_const 2 1
-                        : concat [ [ Oz_sub_offset 0 0 2 
+                        : concat (replicate (size - 1) 
+                                   [ Oz_sub_offset 0 0 2 
                                    , Oz_sub_offset 1 1 2
                                    , Oz_load_indirect 3 1
                                    , Oz_store_indirect 0 3
-                                   ] 
-                                 | i <- [1..size - 1]
-                                 ]
+                                   ])
                      else []
       startLabel <- nextLabel
       endLabel <- nextLabel
@@ -188,11 +184,6 @@ genStmt st (AST.Assign lval (AST.LVal _ rval))
             ++ if length unrolled <= length looped -- choose shortest option
                then unrolled
                else looped
-  where 
-    lAlias = AST.getLId lval
-    rAlias = AST.getLId rval
-    getOffset alias 
-      = getLocalOffsetErr st alias ("Unknown variable `" ++ alias ++ "`")
 genStmt st (AST.Assign l e) =
   do 
     putRegister 0
@@ -268,8 +259,8 @@ genStmt st (AST.While e ss) =
              ]
 genStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
   do 
-    proc@(ST.Procedure paramTable _ _) 
-      <- maybeErr ("Unknown procedure `" ++ name ++ "`")
+    ST.Procedure paramTable _ _
+          <- maybeErr ("Unknown procedure `" ++ name ++ "`")
                   $ lookup name ps
     pCode <- repeatGen (\(i,p,a) -> putRegister i >> genParam p a) 
              $ zip3 [0..] (map snd paramTable) args 
@@ -330,7 +321,7 @@ genLValue st (AST.LInd alias e) =
   do 
     offset <- getLocalOffsetErr st alias 
                 ("Unknown parameter/variable `" ++ alias ++ "`")
-    let AST.ArrayT aAlias size = ST.getProcType st alias
+    let AST.ArrayT aAlias _ = ST.getProcType st alias
     let size = ST.lookupElementSize st $ AST.Alias aAlias
     r <- getRegister
     eCode <- genExpr st e

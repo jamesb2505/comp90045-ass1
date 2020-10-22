@@ -115,10 +115,11 @@ pLValue (LIndField i e f) = i ++ "[" ++ pExpr e ++ "]." ++ f
 pProcedure :: Procedure -> String
 pProcedure (Procedure i ps vs ss) = "procedure " ++ i 
                                     ++ " (" ++ pParamComma ps ++")\n" 
-                                    ++ vars vs ++ "{\n" ++ pStmts ss ++ "}"
+                                    ++ vars ++ "{\n" ++ pStmts ss ++ "}"
   where 
-    vars [] = []
-    vars vs = intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
+    vars = if null vs
+           then ""
+           else intercalate ";\n" (map (indent . pVar) vs) ++ ";\n"
 
 -- pVar
 -- Constructs a pretty printed String representation of a Var

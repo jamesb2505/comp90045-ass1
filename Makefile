@@ -19,7 +19,7 @@ DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(GEN)
 .PHONY: all gen clean cleanly clobber
 
 $(EXE): $(DEPS) $(MAIN)
-	$(HC) $(HCFLAGS) $^ -o $@
+	$(HC) $(HCFLAGS) $^ -o $@ -Wall
 
 $(SRC)/RooLexer.hs: $(SRC)/RooLexer.x
 	$(ALEX) $< -o $@

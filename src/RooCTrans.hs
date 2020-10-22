@@ -128,8 +128,8 @@ transStmt st (AST.Read l) =
       AST.IntT  -> return $ [ "if (scanf(\"%d\", " ++ lCode
                               ++ ") != 1) { fprintf(stderr, \
                                  \\"cannot read integer\\n\"); exit(1); }" ]
-      AST.BoolT -> return $ [ "{ char buf[256]; \
-                              \if (scanf(\"%s\", buf) <= 0) { \
+      AST.BoolT -> return $ [ "{ char buf[7]; \
+                              \if (scanf(\"%6s\", buf) != 1) { \
                               \fprintf(stderr, \
                               \\"cannot read bool\\n\"); exit(1); \
                               \} else if (!strcmp(buf, \"true\")) { *"

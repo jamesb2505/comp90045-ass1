@@ -13,7 +13,7 @@ _MAIN = Main.hs
 MAIN  = $(patsubst %,$(APP)/%,$(_MAIN))
 _GEN  = RooLexer.hs RooParser.hs
 GEN   = $(patsubst %,$(SRC)/%,$(_GEN))
-_DEPS = RooAST.hs PrettyRoo.hs RooSymbolTable.hs RooOzCodeGen.hs OzCode.hs
+_DEPS = RooAST.hs PrettyRoo.hs RooSymbolTable.hs RooOzCodeGen.hs OzCode.hs RooCTrans.hs
 DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(GEN)
 
 .PHONY: all gen clean cleanly clobber

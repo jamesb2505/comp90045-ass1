@@ -269,6 +269,8 @@ fmtUnOp AST.Op_not = "!"
 fmtUnOp AST.Op_neg = "-"
 
 fmtIdentifier :: AST.Ident -> String
-fmtIdentifier ('\'':ss) = "__APOSTROPHE__" ++ fmtIdentifier ss
-fmtIdentifier (s:ss) = s:fmtIdentifier ss
-fmtIdentifier [] = []
+fmtIdentifier ident = concatMap fmtIdentChar ident
+  where
+    fmtIdentChar '_'  = "__"
+    fmtIdentChar '\'' = "_a"
+    fmtIdentChar c    = [c]

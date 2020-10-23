@@ -1,3 +1,11 @@
+-------------------------
+-- RooAST
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Specification of an AST for Roo
+-------------------------
+
 module RooCTrans
     ( runCTrans
     ) where
@@ -8,8 +16,6 @@ import qualified RooSymbolTable as ST
 import Control.Monad (liftM)
 import Data.List (intercalate)
 import Data.Maybe (fromJust)
-
-
 
 -- runCTrans 
 -- Performs C transpilations of a Roo Program

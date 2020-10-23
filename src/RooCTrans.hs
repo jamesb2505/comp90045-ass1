@@ -175,8 +175,8 @@ transStmt st (AST.Writeln e) =
   do 
     eCode <- transExpr st e
     case AST.getExprType e of
-      AST.BoolT -> return [ "printf(\"%s\", " 
-                            ++ eCode ++ " ? \"true\\n\" : \"false\\n\");" ]
+      AST.BoolT -> return [ "printf(" ++ eCode ++ " ? \"true\\n\"\
+                                                  \ : \"false\\n\");" ]
       AST.IntT  -> return [ "printf(\"%d\\n\", " ++ eCode ++ ");" ]
       AST.StrT  -> return [ "printf(\"%s\\n\", " ++ eCode ++ ");" ]
       _         -> Left "bad writeln type"
@@ -284,7 +284,7 @@ fmtAtomic _ = "int"
 -- Formats an Roo alias (record/array name) into a C name
 -- Appends _t to avoid namespace clashes
 fmtAlias :: AST.Ident -> String
-fmtAlias a = fmtIdent a ++ "_t"
+fmtAlias a = fmtIdent a ++ "_t_"
 
 -- fmtType 
 -- Formats a Roo TypeName into a C type

@@ -1,3 +1,11 @@
+-------------------------
+-- RooPyTrans
+--
+-- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
+--
+-- Roo -> Python transcompiler
+-------------------------
+
 module RooPyTrans
     ( runPyTrans
     ) where

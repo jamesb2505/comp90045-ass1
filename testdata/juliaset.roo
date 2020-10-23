@@ -1,0 +1,56 @@
+record {integer r; integer i} complex;
+
+procedure inSet(complex z, complex c, integer iters)
+  integer temp, mag2;
+{
+  if iters > 0 then
+    temp <- (z.r*z.r - z.i*z.i)/10000 + c.r;
+    z.i <- (2*z.r*z.i)/10000 + c.i;
+    z.r <- temp;
+
+    mag2 <- z.r*z.r/10000 + z.i*z.i/10000;
+
+    if mag2 <= 4*10000 then
+      iters <- iters - 1;
+
+      call inSet(z, c, iters);
+    fi
+  fi
+}
+
+procedure main()
+  integer RES_X, RES_Y, i, j, iters, max_iters;
+  complex c, z, s;
+{ 
+  RES_X <- 30;
+  RES_Y <- 10;
+
+  read s.r;
+  read s.i;
+  read max_iters;
+
+  j <- 2*RES_Y;
+  while j >= -2*RES_Y do
+    i <- -2*RES_X;
+    while i <= 2*RES_X do
+      c.r <- s.r;
+      c.i <- s.i;
+
+      iters <- max_iters;
+      z.r <- i * 10000 / RES_X;
+      z.i <- j * 10000 / RES_Y;
+      call inSet(z, c, iters);
+      
+      if iters = 0 then
+        write "*";
+      else
+        write " ";
+      fi
+
+      i <- i + 1;
+    od
+    writeln "";
+
+    j <- j - 1;
+  od
+}

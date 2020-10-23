@@ -9,26 +9,27 @@ import Control.Monad (liftM)
 import Data.List (intercalate)
 import Data.Maybe (fromJust)
 
+
+
+-- runCTrans 
+-- Performs C transpilations of a Roo Program
 runCTrans :: AST.Program -> ST.SymbolTable -> Either String String
 runCTrans (AST.Program rs as ps) st =
   do 
-    typedefs <- transTypedefs rs as
-    forwardDecs <- transForwardDecs ps
-    procs <- transProcs st ps
+    records <- mapM transRecord rs
+    arrays <- mapM transArray as
+    forwardDecs <- mapM transForwardDec ps
+    procs <- mapM (transProc st) ps
     return $ "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n" 
-          ++ unlines typedefs
+          ++ unlines records
+          ++ unlines arrays
           ++ unlines forwardDecs 
           ++ "\nint main(int argc, int *argv[]) {\n\
              \    main_p();\n    return 0;\n}\n\n"
           ++ unlines procs 
 
-transTypedefs :: [AST.Record] -> [AST.Array] -> Either String [String]
-transTypedefs rs as =
-  do
-    records <- mapM transRecord rs
-    arrays <- mapM transArray as
-    return $ records ++ arrays
-
+-- transRecord 
+-- Transpiles a Roo Record into a C struct
 transRecord :: AST.Record -> Either String String
 transRecord (AST.Record fs alias) = 
   do 
@@ -37,38 +38,46 @@ transRecord (AST.Record fs alias) =
           ++ concatMap ("\n    " ++) fields 
           ++ "\n} " ++ fmtAlias alias ++ ";"
 
+-- transField 
+-- Transpiles a Roo record field into a C struct member 
 transField :: AST.Field -> Either String String
 transField (AST.Field t name) = return $ fmtAtomic t ++ " " 
                                       ++ fmtField name ++ ";"
 
+-- transArray 
+-- Transpiles a Roo array declaration into a C array typedef
 transArray :: AST.Array -> Either String String
 transArray (AST.Array size t alias) 
   = return $ "typedef " ++ fmtType t ++ " " ++ fmtAlias alias
           ++ " [" ++ show size ++ "];"
 
-transForwardDecs :: [AST.Procedure] -> Either String [String]
-transForwardDecs ps = mapM transForwardDec ps
-
+-- transForwardDec 
+-- Transpiles a Roo Procedure into a C-style forward declaration
 transForwardDec :: AST.Procedure -> Either String String
 transForwardDec p = (++ ";") <$> transProcHeader p
 
+-- transProcHeader 
+-- Transpiles a Roo Procedure into a C-style function header
 transProcHeader :: AST.Procedure -> Either String String 
 transProcHeader (AST.Procedure name ps _ _) 
   = ("void " ++) <$> (fmtProcName name ++) <$> ("(" ++) 
     <$> (++ ")") <$> transParams ps
 
+-- transParams 
+-- Transpiles a list of Roo Params into a list of C function parameters
 transParams :: [AST.Param] -> Either String String
 transParams ps = intercalate ", " <$> mapM transParam ps 
 
+-- transParam 
+-- Transpiles a Roo Param into a C function parameter
 transParam :: AST.Param -> Either String String
 transParam (AST.ParamAtomic t mode ident)
-  = return $ fmtAtomic t ++ " " ++ fmtMode mode ++ fmtIdent ident
+  = return $ fmtAtomic t ++ " " ++ fmtMode mode ++ fmtLocal ident
 transParam (AST.ParamAlias alias ident)
-  = return $ fmtAlias alias ++ " *" ++ fmtIdent ident
+  = return $ fmtAlias alias ++ " *" ++ fmtLocal ident
 
-transProcs :: ST.SymbolTable -> [AST.Procedure] -> Either String [String]
-transProcs st ps = mapM (transProc st) ps
-
+-- transProc 
+-- Transpiles a Roo Procedure into a C function definition
 transProc :: ST.SymbolTable -> AST.Procedure -> Either String String
 transProc st@(ST.SymbolTable _ _ ps) p@(AST.Procedure name _ vs ss) =
   do
@@ -84,13 +93,17 @@ transProc st@(ST.SymbolTable _ _ ps) p@(AST.Procedure name _ vs ss) =
                ++ "}"
     else Left $ "unknown procedure `" ++ name ++ "`"
 
+-- transVars 
+-- Transpiles a list of Roo Vars into a list of C variable declarations
 transVars :: ST.SymbolTable -> [AST.Var] -> Either String [String]
 transVars st vs = liftM (map indent) $ mapM (transVar st) vs
 
+-- transVar 
+-- Transpiles a Roo Var declaration into a C variable declaration
 transVar :: ST.SymbolTable -> AST.Var -> Either String String
 transVar st (AST.Var t vs) = 
   do
-    vars <- mapM (return . fmtIdent) vs
+    vars <- mapM (return . fmtLocal) vs
     return $ fmtType t ++ " " 
           ++ (intercalate ", " . map (++ " = " ++ initVal)) vars ++ ";"
   where 
@@ -103,9 +116,13 @@ transVar st (AST.Var t vs) =
                     tArr = ST.getAliasType st a
                     AST.ArrayT _ tRec = tArr 
 
+-- transStmts 
+-- Transpiles a list of Roo Stmts into a list of C statements
 transStmts :: ST.SymbolTable -> [AST.Stmt] -> Either String [String] 
 transStmts st ss = liftM concat $ mapM ((map indent <$>) . transStmt st) ss
 
+-- transStmt 
+-- Transpiles a Roo Stmt into a list of C statements
 transStmt :: ST.SymbolTable -> AST.Stmt -> Either String [String]
 transStmt st (AST.Assign lval (AST.LVal _ rval))
   | ST.isRef st (AST.getLId lval) && ST.isRef st (AST.getLId rval) = 
@@ -124,6 +141,7 @@ transStmt st (AST.Assign l e) =
 transStmt st (AST.Read l) =
   do
     lCode <- transLValue st l  
+    -- need to error check depending on type
     case ST.getLValueType st l of
       AST.IntT  -> return $ [ "if (scanf(\"%d\", " ++ lCode
                               ++ ") != 1) { fprintf(stderr, \
@@ -179,17 +197,21 @@ transStmt st (AST.While e ss) =
 transStmt st@(ST.SymbolTable _ _ ps) (AST.Call name args) =
   do 
     let params = map snd . ST.unParams . fromJust $ lookup name ps
-    pCode <- mapM (uncurry (transArg st)) (zip params args)
+    pCode <- mapM (uncurry $ transArg st) (zip params args)
     if ST.isTableKey name ps
     then return [ fmtProcName name ++ "(" ++ intercalate ", " pCode ++ ");" ]
     else Left $ "unknown procedure `" ++ name ++ "`"
 
+-- transArg 
+-- Transpiles a Roo call argument into a C function argument
 transArg :: ST.SymbolTable -> ST.Param -> AST.Expr -> Either String String
 transArg st (ST.Param _ AST.Ref _) (AST.LVal _ lval) 
   = transLValue st lval
 transArg st _ e 
   = transExpr st e
 
+-- transExpr 
+-- Transpiles a Roo Expr into a C expression
 transExpr :: ST.SymbolTable -> AST.Expr -> Either String String
 transExpr st (AST.LVal _ l) = ("*" ++) <$> transLValue st l 
 transExpr _ (AST.BoolConst _ b) = return $ if b then "1" else "0"
@@ -203,56 +225,88 @@ transExpr st (AST.BinOpExpr _ op a b) =
 transExpr st (AST.UnOpExpr _ op a) 
   = (fmtUnOp op ++) <$> ("(" ++) <$> (++ ")") <$> transExpr st a
 
+-- transLValue 
+-- Transpiles a Roo LValue into a C lvalue
+-- C lvalue is by referece, so to get the value, prepend a *
 transLValue :: ST.SymbolTable -> AST.LValue -> Either String String
 transLValue st (AST.LId ident) 
   = return $ if ST.isRef st ident
-             then fmtIdent ident
-             else "&" ++ fmtIdent ident
+             then fmtLocal ident
+             else "&" ++ fmtLocal ident
 transLValue st (AST.LField ident field) 
   = return $ if ST.isRef st ident
-             then "&" ++ fmtIdent ident ++ "->" ++ fmtField field
-             else "&" ++ fmtIdent ident ++ "." ++ fmtField field
+             then "&" ++ fmtLocal ident ++ "->" ++ fmtField field
+             else "&" ++ fmtLocal ident ++ "." ++ fmtField field
 transLValue st (AST.LInd ident e) =
   do 
     eCode <- transExpr st e
     return $ if ST.isRef st ident
-             then "&(*" ++ fmtIdent ident ++ ")[" ++ eCode ++ "]"
-             else "&(" ++ fmtIdent ident ++ "[" ++ eCode ++ "])"
+             then "&(*" ++ fmtLocal ident ++ ")[" ++ eCode ++ "]"
+             else "&(" ++ fmtLocal ident ++ "[" ++ eCode ++ "])"
 transLValue st (AST.LIndField ident e field) =
   do 
     eCode <- transExpr st e
     return $ if ST.isRef st ident
-             then "&(*" ++ fmtIdent ident ++ ")[" ++ eCode ++ "]."
+             then "&(*" ++ fmtLocal ident ++ ")[" ++ eCode ++ "]."
                   ++ fmtField field
-             else "&(" ++ fmtIdent ident ++ "[" ++ eCode ++ "]." 
+             else "&(" ++ fmtLocal ident ++ "[" ++ eCode ++ "]." 
                   ++ fmtField field ++ ")"
 
+
+-- fmtIdent 
+-- Formats an Roo Ident to be a vlaid C identifier
+-- C does not allow ' in identifiers, and as such ' are replaced with _a
+-- and _ are replaced with __ to avoid clashes 
+fmtIdent :: AST.Ident -> String
+fmtIdent ident = concatMap fmtIdentChar ident
+  where
+    fmtIdentChar '_'  = "__"
+    fmtIdentChar '\'' = "_a"
+    fmtIdentChar c    = [c]
+
+-- fmtAtomic 
+-- Formats a Roo AtomicType into a C type
+-- All types are converted to int
 fmtAtomic :: AST.AtomicType -> String
 fmtAtomic _ = "int"
 
+-- fmtAlias 
+-- Formats an Roo alias (record/array name) into a C name
+-- Appends _t to avoid namespace clashes
 fmtAlias :: AST.Ident -> String
-fmtAlias a = fmtIdentifier a ++ "_t"
+fmtAlias a = fmtIdent a ++ "_t"
 
+-- fmtType 
+-- Formats a Roo TypeName into a C type
 fmtType :: AST.TypeName -> String
 fmtType (AST.Alias a) = fmtAlias a
 fmtType _             = "int"
 
+-- fmtProcName 
+-- Formats a Roo Procedure name into a C name
+-- Appends _p to avoid namespace clashes 
 fmtProcName :: AST.Ident -> String
-fmtProcName name = fmtIdentifier name ++ "_p"
+fmtProcName name = fmtIdent name ++ "_p"
 
+-- fmtField 
+-- Formats a Roo Field name name into a C name
 fmtField :: AST.Ident -> String
-fmtField f = fmtIdentifier f
+fmtField f = fmtIdent f
 
+-- fmtMode 
+-- Formats a Roo Mode name name into a C mode
 fmtMode :: AST.Mode -> String
 fmtMode AST.Ref = "*"
 fmtMode AST.Val = ""
 
-fmtIdent :: AST.Ident -> AST.Ident
-fmtIdent ident = fmtIdentifier ident ++ "_i"
+-- fmtLocal 
+-- Formats a Roo Procedure variable/parameter into a C name
+-- Appends _i to avoid namespace clashes 
+fmtLocal :: AST.Ident -> AST.Ident
+fmtLocal ident = fmtIdent ident ++ "_i"
 
-indent :: String -> String
-indent s = "    " ++ s
-
+-- fmtBinOp 
+-- Formats a Roo BinOp into a C binary operator
 fmtBinOp :: AST.BinOp -> String
 fmtBinOp AST.Op_or  = "||"
 fmtBinOp AST.Op_and = "&&"
@@ -267,13 +321,13 @@ fmtBinOp AST.Op_sub = "-"
 fmtBinOp AST.Op_mul = "*"
 fmtBinOp AST.Op_div = "/"
 
+-- fmtUnOp 
+-- Formats a Roo UnOp into a C unary operator
 fmtUnOp :: AST.UnOp -> String
 fmtUnOp AST.Op_not = "!"
 fmtUnOp AST.Op_neg = "-"
 
-fmtIdentifier :: AST.Ident -> String
-fmtIdentifier ident = concatMap fmtIdentChar ident
-  where
-    fmtIdentChar '_'  = "__"
-    fmtIdentChar '\'' = "_a"
-    fmtIdentChar c    = [c]
+-- indent 
+-- Indents a String
+indent :: String -> String
+indent s = "    " ++ s

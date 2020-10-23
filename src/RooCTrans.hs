@@ -1,9 +1,9 @@
 -------------------------
--- RooAST
+-- RooCTrans
 --
 -- Written by James Barnes, Jack Macumber, & Isitha Subasinghe
 --
--- Specification of an AST for Roo
+-- Roo -> C transcompiler
 -------------------------
 
 module RooCTrans

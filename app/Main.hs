@@ -12,6 +12,8 @@
 --  * -a <filename>
 --      prints the AST representing to Roo program
 --  * -c <filename>
+--      prints C code equivalent to the Roo code; beware of undefined 
+--  * -py <filename>
 --      prints C code equivalent to the Roo code; beware of undefined behaviour
 -------------------------
 
@@ -21,6 +23,7 @@ import RooParser (runParser)
 import RooLexer (runLexer)
 import RooOzCodeGen (runCodeGen)
 import RooCTrans (runCTrans)
+import RooPyTrans (runPyTrans)
 import OzCode (printOzCodes)
 import RooAST (Program)
 import RooSymbolTable (SymbolTable)
@@ -35,6 +38,7 @@ data Task
   | PrettyPrint String
   | CodeGen String
   | CTrans String
+  | PyTrans String
   deriving (Eq, Show)
 
 main :: IO ()
@@ -47,6 +51,7 @@ main = do
     PrettyPrint filename -> doParse prettyPrint filename
     CodeGen filename     -> doCodeGen runCodeGen printOzCodes filename
     CTrans filename      -> doCodeGen runCTrans putStrLn filename
+    PyTrans filename     -> doCodeGen runPyTrans putStrLn filename
 
 -- checkArgs
 -- checks for valid command line arguments
@@ -60,6 +65,8 @@ checkArgs _ ["-p", filename] =
   return $ PrettyPrint filename
 checkArgs _ ["-c", filename] =
   return $ CTrans filename
+checkArgs _ ["-py", filename] =
+  return $ PyTrans filename
 checkArgs _ [filename] =
   return $ CodeGen filename
 checkArgs progname _ =

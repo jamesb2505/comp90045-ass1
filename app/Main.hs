@@ -12,9 +12,9 @@
 --  * -a <filename>
 --      prints the AST representing to Roo program
 --  * -c <filename>
---      prints C code equivalent to the Roo code; beware of undefined 
---  * -py <filename>
 --      prints C code equivalent to the Roo code; beware of undefined behaviour
+--  * -py <filename>
+--      prints Python code equivalent to the Roo code; beware of undefined behaviour
 -------------------------
 
 module Main (main) where

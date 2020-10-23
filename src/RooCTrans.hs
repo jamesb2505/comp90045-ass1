@@ -173,9 +173,13 @@ transStmt st (AST.Write e) =
       _         -> Left "bad write type"
 transStmt st (AST.Writeln e) = 
   do 
-    writeCode <- transStmt st (AST.Write e)
-    return $ writeCode
-          ++ [ "printf(\"\\n\");" ]
+    eCode <- transExpr st e
+    case AST.getExprType e of
+      AST.BoolT -> return [ "printf(\"%s\", " 
+                            ++ eCode ++ " ? \"true\\n\" : \"false\\n\");" ]
+      AST.IntT  -> return [ "printf(\"%d\\n\", " ++ eCode ++ ");" ]
+      AST.StrT  -> return [ "printf(\"%s\\n\", " ++ eCode ++ ");" ]
+      _         -> Left "bad writeln type"
 transStmt st (AST.If e ss) =
   do
     eCode <- transExpr st e

@@ -31,6 +31,21 @@ $ ./oz/oz prog.oz
   ```sh
   $ ./Roo -a prog.roo
   ```
+  
+* Roo -> C transcompilation
+
+  ```sh
+  $ ./Roo -c prog.roo > proc.c
+  $ gcc -O3 prog.c -o prog
+  $ ./prog
+  ```
+  
+* Roo -> Python transcompilation
+
+  ```sh
+  $ ./Roo -py prog.roo > prog.py
+  $ python3 prog.py
+  ```
 
 ## Samples
 

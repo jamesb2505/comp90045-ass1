@@ -1,4 +1,4 @@
 |Q| = q_0 = q_a = q_r = d(q, s) = q' s' [L|R]
-d(0, _) = d(0, 0) = d(0, 1) = d(1, _) = d(1, 0) = d(1, 1) = |1| = input w consists of 0s and 1s, anything else is reverted to 0
+d(0, _) = d(0, 0) = d(0, 1) = d(1, _) = d(1, 0) = d(1, 1) = |w| = input w consists of 0s and 1s, anything else is reverted to 0
 w = 
 accept

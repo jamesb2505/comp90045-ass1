@@ -46,7 +46,7 @@ procedure main ()
         fi
         i <- i + 1;
     od
-    write "|1| = ";
+    write "|w| = ";
     read w_len;
     writeln "input w consists of 0s and 1s, anything else is reverted to 0";
     write "w = ";

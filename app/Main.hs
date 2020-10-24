@@ -70,7 +70,7 @@ checkArgs _ ["-py", filename] =
 checkArgs _ [filename] =
   return $ CodeGen filename
 checkArgs progname _ =
-  printErrorExit 1 $ "Usage: " ++ progname ++ " [-a|-p] filename"
+  printErrorExit 1 $ "Usage: " ++ progname ++ " [-a|-p|-c|-py] filename"
 
 -- doParse
 -- parses program specified by a given filename and prints a rendered version 

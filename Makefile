@@ -1,6 +1,6 @@
 
 HC      = ghc
-HCFLAGS = -O2
+HCFLAGS = -O2 -Wall -fno-warn-unused-imports
 HAPPY   = happy
 ALEX    = alex
 
@@ -19,7 +19,7 @@ DEPS  = $(patsubst %,$(SRC)/%,$(_DEPS)) $(GEN)
 .PHONY: all gen clean cleanly clobber
 
 $(EXE): $(DEPS) $(MAIN)
-	$(HC) $(HCFLAGS) $^ -o $@ -Wall
+	$(HC) $(HCFLAGS) $^ -o $@
 
 $(SRC)/RooLexer.hs: $(SRC)/RooLexer.x
 	$(ALEX) $< -o $@

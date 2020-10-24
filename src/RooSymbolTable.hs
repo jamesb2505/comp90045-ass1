@@ -269,7 +269,7 @@ lookupTotalSize st@(SymbolTable rs as _) (AST.Alias alias)
 lookupTotalSize _ _ = 1
 
 -- lookupElementSize
--- Looks up up the size of an element of a givent AST.TypeName
+-- Looks up up the size of an element of a given AST.TypeName
 lookupElementSize :: SymbolTable -> AST.TypeName -> Int
 lookupElementSize st@(SymbolTable _ as _) (AST.Alias alias)
   | isTableKey alias as

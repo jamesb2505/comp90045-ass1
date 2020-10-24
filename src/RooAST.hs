@@ -108,8 +108,8 @@ data Expr
   deriving (Show, Eq)
 
 -- ExprType
--- Represents the type of an expresion
--- This is inferred by the expression and it's arguement's types
+-- Represents the type of an expression
+-- This is inferred by the expression and it's argument's types
 data ExprType
   = BoolT
   | IntT
@@ -137,7 +137,7 @@ data BinOp
   deriving (Show, Eq)
 
 -- UnOp
--- Represents a unary operaton
+-- Represents a unary operator
 data UnOp
   = Op_not
   | Op_neg

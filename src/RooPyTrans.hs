@@ -21,8 +21,9 @@ runPyTrans :: AST.Program -> ST.SymbolTable -> Either String String
 runPyTrans (AST.Program _ _ ps) st =
   do 
     procs <- transProcs st ps
-    return $ unlines procs 
-          ++ "\nif __name__ == '__main__':\n\
+    return $ "from copy import deepcopy\n\n"
+          ++ unlines procs 
+          ++ "if __name__ == '__main__':\n\
              \    main_p()\n"
 
 transProcHeader :: AST.Procedure -> Either String String 
@@ -64,8 +65,11 @@ transProc st@(ST.SymbolTable _ _ ps) p@(AST.Procedure name params vs ss) =
     then return $ header ++ ":\n" 
                ++ unlines vars
                ++ unlines stmts
-               ++ indent "return " ++ ret ++ "\n"
+               ++ indent "return" ++ fixReturn (" " ++ ret) ++ "\n"
     else Left $ "unknown procedure `" ++ name ++ "`"
+  where 
+    fixReturn " " = ""
+    fixReturn ret = ret
 
 transVars :: ST.SymbolTable -> [AST.Var] -> Either String [String]
 transVars st vs = liftM (map indent) $ mapM (transVar st) vs
@@ -120,7 +124,7 @@ transStmt st (AST.Assign lval (AST.LVal _ rval))
     do
       lCode <- transLValue lval
       rCode <- transLValue rval
-      return [ lCode ++ " = " ++ rCode ]
+      return [ lCode ++ " = deepcopy(" ++ rCode ++ ")"]
 transStmt _ (AST.Assign l e) = 
   do 
     lCode <- transLValue l

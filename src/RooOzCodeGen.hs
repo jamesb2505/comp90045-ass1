@@ -24,7 +24,7 @@ data Gen = Gen LabelNum RegNum
 
 -- GenState
 -- ExceptT wrapped (Stage Gen)
--- Used to propogate errors through a successive generators
+-- Used to propagate errors through a successive generators
 type GenState = ExceptT String (State Gen)
 
 -- nextLabel
@@ -406,7 +406,7 @@ genExpr st (AST.UnOpExpr _ op a) =
           ++ [ getUnOpCode op r r ]
 
 -- getLocalOffsetErr
--- Gets the local offset of an AST.Ident (variabl/parameter)
+-- Gets the local offset of an AST.Ident (variable/parameter)
 -- It is assumed that the current procedure is at the top of the 
 -- procedures of the ST.SymbolTable
 getLocalOffsetErr :: ST.SymbolTable -> AST.Ident -> String -> GenState Int

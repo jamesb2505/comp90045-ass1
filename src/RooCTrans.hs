@@ -237,7 +237,7 @@ transExpr st (AST.UnOpExpr _ op a)
 
 -- transLValue 
 -- Transpiles a Roo LValue into a C lvalue
--- C lvalue is by referece, so to get the value, prepend a *
+-- C lvalue is by reference, so to get the value, prepend a *
 transLValue :: ST.SymbolTable -> AST.LValue -> Either String String
 transLValue st (AST.LId ident) 
   = return $ if ST.isRef st ident
@@ -264,7 +264,7 @@ transLValue st (AST.LIndField ident e field) =
 
 
 -- fmtIdent 
--- Formats an Roo Ident to be a vlaid C identifier
+-- Formats an Roo Ident to be a valid C identifier
 -- C does not allow ' in identifiers, and as such ' are replaced with _a
 -- and _ are replaced with __ to avoid clashes 
 fmtIdent :: AST.Ident -> String

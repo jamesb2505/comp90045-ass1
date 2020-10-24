@@ -192,7 +192,7 @@ instance Show OzCode where
     = "\tdebug_stack"
 
 -- fmtReg
--- Formates a RegNum
+-- Formats a RegNum
 fmtReg :: RegNum -> String
 fmtReg n = "r" ++ show n
 

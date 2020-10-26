@@ -180,7 +180,7 @@ indentation :: Int
 indentation = 4
 
 -- indent
--- Indents a String with preceeding spaces
+-- Indents a String with preceding spaces
 indent :: String -> String
 indent s = replicate indentation ' ' ++ s
 

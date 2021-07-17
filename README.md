@@ -67,16 +67,3 @@ proc_main:
     call_builtin print_newline
     return
 ```
-  
-## Grades
-* Part 1: Parser and Pretty Printer
-  
-  11.5/12 (0.5 lost due to code style)
-  
-* Part 2: Individual Peer Reviews
-
-  Withheld
-  
-* Part 3: Code Generation
-
-  TBC

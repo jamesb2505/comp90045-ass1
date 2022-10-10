@@ -32,15 +32,14 @@ import Data.Tuple.Extra (second)
 -- Attributes are both inherited and synthesised, based on the context
 -- of the parsing
 %attributetype { Attribute a }
-%attribute value    { a }
-%attribute records  { ST.Table ST.Record }
-%attribute arrays   { ST.Table ST.Array }
-%attribute procs    { ST.Table ST.Procedure }
-%attribute protos   { ST.Table (ST.Table ST.Param) }
-%attribute protosup { ST.Table (ST.Table ST.Param) }
-%attribute symtab   { ST.SymbolTable }
-%attribute etype    { AST.ExprType }
-%attribute posn     { L.AlexPosn }
+%attribute value   { a }
+%attribute records { ST.Table ST.Record }
+%attribute arrays  { ST.Table ST.Array }
+%attribute procs   { ST.Table ST.Procedure }
+%attribute protos  { ST.Table (ST.Table ST.Param) }
+%attribute symtab  { ST.SymbolTable }
+%attribute etype   { AST.ExprType }
+%attribute posn    { L.AlexPosn }
 
 %token
   and        { (_, L.T_and) }
@@ -228,7 +227,7 @@ procedures -- ~ :: { [AST.Procedure] }
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
     ; $$.procs = reverse $1.procs
-    ; $1.protos = $1.protosup
+    ; $1.protos = map (second ST.unParams) $$.procs
     }
 -- parses a non-empty sequence of procedure definitions
 -- ensures all procedures have distinct names
@@ -239,7 +238,6 @@ procedures_ -- ~ :: { [AST.Procedure] }
     ; $$.procs = $1.procs
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
-    ; $$.protosup = $1.protosup
     ; $1.protos = $$.protos
     }
   | procedures_ proc 
@@ -249,7 +247,6 @@ procedures_ -- ~ :: { [AST.Procedure] }
     ; $1.arrays = $$.arrays
     ; $2.arrays = $$.arrays 
     ; $$.procs = $2.procs ++ $1.procs
-    ; $$.protosup = $2.protosup ++ $1.protosup
     ; $1.protos = $$.protos
     ; $2.protos = $$.protos
     ; where checkDuplicate (fst $ head $2.procs) (ST.tableKeys $1.procs)
@@ -265,7 +262,6 @@ proc -- ~ :: { AST.Procedure }
         = [ ST.convertProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
-    ; $$.protosup = map (second ST.unParams) $$.procs
     ; $8.protos = $$.protos
     ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
     ; $4.symtab = $$.symtab

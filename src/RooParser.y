@@ -19,6 +19,7 @@ import qualified RooAST as AST
 import Control.Monad (unless)
 import Data.Maybe (fromJust)
 import Data.List (nub)
+import Data.Tuple.Extra (second)
 }
 
 %name runHappy program
@@ -35,6 +36,7 @@ import Data.List (nub)
 %attribute records { ST.Table ST.Record }
 %attribute arrays  { ST.Table ST.Array }
 %attribute procs   { ST.Table ST.Procedure }
+%attribute protos  { ST.Table (ST.Table ST.Param) }
 %attribute symtab  { ST.SymbolTable }
 %attribute etype   { AST.ExprType }
 %attribute posn    { L.AlexPosn }
@@ -225,6 +227,7 @@ procedures -- ~ :: { [AST.Procedure] }
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
     ; $$.procs = reverse $1.procs
+    ; $1.protos = map (second ST.unParams) $$.procs
     }
 -- parses a non-empty sequence of procedure definitions
 -- ensures all procedures have distinct names
@@ -232,10 +235,10 @@ procedures -- ~ :: { [AST.Procedure] }
 procedures_ -- ~ :: { [AST.Procedure] }
   : proc             
     { $$ = [$1]
-    ; $$.procs 
-        = [ ST.convertProcedure (ST.SymbolTable $$.records $$.arrays []) $1 ]
+    ; $$.procs = $1.procs
     ; $1.records = $$.records
     ; $1.arrays = $$.arrays
+    ; $1.protos = $$.protos
     }
   | procedures_ proc 
     { $$ = $2:$1
@@ -244,6 +247,8 @@ procedures_ -- ~ :: { [AST.Procedure] }
     ; $1.arrays = $$.arrays
     ; $2.arrays = $$.arrays 
     ; $$.procs = $2.procs ++ $1.procs
+    ; $1.protos = $$.protos
+    ; $2.protos = $$.protos
     ; where checkDuplicate (fst $ head $2.procs) (ST.tableKeys $1.procs)
                            $2.posn "duplicate procedure name"
     }
@@ -257,6 +262,7 @@ proc -- ~ :: { AST.Procedure }
         = [ ST.convertProcedure (ST.SymbolTable $$.records $$.arrays []) $$ ]
     ; $8.records = $$.records
     ; $8.procs = $$.procs
+    ; $8.protos = $$.protos
     ; $$.symtab = ST.SymbolTable $$.records $$.arrays $$.procs
     ; $4.symtab = $$.symtab
     ; $6.symtab = $$.symtab
@@ -350,6 +356,7 @@ stmts -- ~ :: { [AST.Stmt] }
     { $$ = reverse $1 
     ; $1.records = $$.records 
     ; $1.symtab = $$.symtab 
+    ; $1.protos = $$.protos
     } 
 -- parses a (non-empty) sequence of statements
 -- WARNING: output in reverse
@@ -357,14 +364,17 @@ stmts_ -- ~ :: { [AST.Stmt] }
   : stmt        
     { $$ = [$1] 
     ; $1.records = $$.records 
-    ; $1.symtab = $$.symtab 
+    ; $1.symtab = $$.symtab  
+    ; $1.protos = $$.protos
     }
   | stmts_ stmt 
     { $$ = $2:$1
     ; $1.records = $$.records
     ; $2.records = $$.records 
     ; $1.symtab = $$.symtab
-    ; $2.symtab = $$.symtab 
+    ; $2.symtab = $$.symtab  
+    ; $1.protos = $$.protos 
+    ; $2.protos = $$.protos
     }  
 
 -- parses a statement
@@ -409,7 +419,9 @@ stmt -- ~ :: { AST.Stmt }
     ; $6.records = $$.records 
     ; $2.symtab = $$.symtab
     ; $4.symtab = $$.symtab
-    ; $6.symtab = $$.symtab
+    ; $6.symtab = $$.symtab 
+    ; $4.protos = $$.protos 
+    ; $6.protos = $$.protos
     ; where unless (AST.isBoolT $2.etype)
                    (fmtErr (fst $1) "bad if-then-else condition type")
     }
@@ -419,6 +431,7 @@ stmt -- ~ :: { AST.Stmt }
     ; $4.records = $$.records 
     ; $2.symtab = $$.symtab
     ; $4.symtab = $$.symtab 
+    ; $4.protos = $$.protos
     ; where unless (AST.isBoolT $2.etype)
                    (fmtErr (fst $1) "bad if-then condition type")
     }
@@ -427,7 +440,8 @@ stmt -- ~ :: { AST.Stmt }
     ; $2.records = $$.records
     ; $4.records = $$.records 
     ; $2.symtab = $$.symtab
-    ; $4.symtab = $$.symtab 
+    ; $4.symtab = $$.symtab  
+    ; $4.protos = $$.protos
     ; where unless (AST.isBoolT $2.etype)
                    (fmtErr (fst $1) "bad while condition type")
     }
@@ -435,6 +449,17 @@ stmt -- ~ :: { AST.Stmt }
     { $$ = AST.Call $2 $4 
     ; $4.records = $$.records
     ; $4.symtab = $$.symtab 
+    ; where let (arity, types, modes) = checkCall $$.symtab $$.protos $2 $4 in
+            let err = fmtErr (fst $1)
+            in
+              unless (ST.isTableKey $2 $$.protos)
+                (err $ "unknown call to `" ++ $2 ++ "`") >>
+              unless (arity)
+                (err $ "arity error in call to `" ++ $2 ++ "`") >>
+              unless (types)
+                (err $ "type error in call to `" ++ $2 ++ "`") >>
+              unless (modes)
+                (err $ "mode error in call to `" ++ $2 ++ "`")
     }
 
 -- parses an lval
@@ -733,7 +758,6 @@ runParser :: [L.Lexeme] -> Either String (AST.Program, ST.SymbolTable)
 runParser ls =
   do
     out@(prog, st) <- runHappy ls
-    checkAllCalls st prog -- because happy code can't check validity of calls
     return out
 
 -- parseError
@@ -767,43 +791,20 @@ checkDuplicates xs err = unless (noDuplicates xs) err
 noDuplicates :: (Eq a) => [a] -> Bool
 noDuplicates xs = length (nub xs) == length xs 
 
--- checkAllCalls
--- Checks if all `call` statements in a Program are correct
--- fail if invalid call is found
-checkAllCalls :: ST.SymbolTable -> AST.Program -> Either String ()
-checkAllCalls st (AST.Program _ _ ps) = sequence_ $ map (checkProcCalls st) ps
-
--- checkAllCalls
--- Checks if all `call` statements in a ST.Procedure are correct
--- fail if invalid call is found
-checkProcCalls :: ST.SymbolTable -> AST.Procedure -> Either String ()
-checkProcCalls st (AST.Procedure ident _ _ ss) =
-  do
-    case lookup ident procs of
-      Nothing                        -> Left "unknown procedure"
-      Just (ST.Procedure params _ _) -> checkAll ss
-  where
-    procs :: ST.Table ST.Procedure
-    procs = ST.unProcedures st
-    checkAll :: [AST.Stmt] -> Either String ()
-    checkAll ss = sequence_ $ map check ss
-    check :: AST.Stmt -> Either String ()
-    check (AST.If _ ss)        = checkAll ss 
-    check (AST.IfElse _ ts fs) = checkAll $ ts ++ fs
-    check (AST.While _ ss)     = checkAll ss 
-    check (AST.Call p args)    = unless (checkCall p args)
-                                        (Left $ "bad call to `" ++ p
-                                             ++ "` in `" ++ ident ++ "`")
-    check _                    = return () 
-    checkCall :: AST.Ident -> [AST.Expr] -> Bool
-    checkCall proc args = ST.isTableKey proc procs 
-                          && length args == length callParams 
-                          && and (zipWith validArg callParams args)
-      where 
-        callParams = map snd . ST.unParams . fromJust $ lookup proc procs
-        validArg :: ST.Param -> AST.Expr -> Bool
-        validArg (ST.Param t m _) a = AST.getExprType a == ST.getType st t
-                                      && (AST.isLVal a || m == AST.Val)
+-- checkCall
+-- Checks if a call is arity, type and mode correct.
+-- Assumes that proc is a key in 
+checkCall :: ST.SymbolTable -> ST.Table (ST.Table ST.Param) 
+          -> AST.Ident -> [AST.Expr] -> (Bool, Bool, Bool)
+checkCall st protos proc args = 
+  ( length args == length callParams 
+  , and (zipWith validType callParams args)
+  , and (zipWith validMode callParams args) 
+  )
+  where 
+    callParams = map snd . fromJust $ lookup proc protos
+    validType (ST.Param t _ _) a = AST.getExprType a == ST.getType st t
+    validMode (ST.Param _ m _) a = AST.isLVal a || m == AST.Val
 
 -- checkAssignRef
 -- Checks that an assignment is valid given the types
